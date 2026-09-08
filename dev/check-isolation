@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+test ! -e /run/dbus/system_bus_socket
+test ! -e "$XDG_RUNTIME_DIR/bus"
+test -z "${HYPRLAND_INSTANCE_SIGNATURE:-}"
+test -z "${WAYLAND_DISPLAY:-}"
+test -z "${NIRI_SOCKET:-}"
+test -f "$HOME/.config/omarchy/shell.json"
+test -n "${DBUS_SESSION_BUS_ADDRESS:-}"
+test ! -w /usr/share/omarchy/shell/shell.qml
+test ! -w /opt/omarchy-mouse-shell/base/shell/shell.qml
+printf 'private-home-write-test\n' > "$HOME/.isolation-probe"
+echo 'PASS: private home and bus; host runtime hidden; installed and copied sources read-only.'

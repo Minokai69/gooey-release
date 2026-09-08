@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -u
+/opt/omarchy-mouse-shell/dev/smoke
+result=$?
+echo "$result" > "$XDG_CACHE_HOME/omarchy-mouse-smoke.status"
+hyprctl dispatch 'hl.dsp.exit()' >/dev/null 2>&1
+exit "$result"

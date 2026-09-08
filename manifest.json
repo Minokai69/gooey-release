@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "gooey.window-tools",
+  "name": "Gooey",
+  "version": "0.1.0-preview.1",
+  "author": "Minokai69 and Gooey contributors",
+  "description": "Mouse-friendly window navigation for Hyprland with Omarchy; use visible controls alongside your keybindings. Requires manual native-companion setup.",
+  "kinds": [
+    "service",
+    "panel",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "experience/plugins/gooey.window-tools/WindowService.qml",
+    "panel": "experience/plugins/gooey.window-tools/WindowMenu.qml",
+    "barWidget": "experience/plugins/gooey.window-tools/ShelfWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Shelf",
+    "description": "Find and take back windows on the Shelf",
+    "category": "Compositor",
+    "allowMultiple": false,
+    "defaultSection": "left"
+  }
+}

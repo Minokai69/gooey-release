@@ -1,0 +1,398 @@
+{
+  "source": "isolated Gooey fixture desktop",
+  "scale": 2,
+  "release": "0.1.0-dev-ba91a43d0d1b",
+  "images": [
+    {
+      "file": "dwindle-frame.png",
+      "region": {
+        "x": 12,
+        "y": 38,
+        "width": 621,
+        "height": 26
+      },
+      "padding": 0,
+      "pixelWidth": 1242,
+      "pixelHeight": 52,
+      "sha256": "337fdf7c8f21cab1f1b48957b4265e305d53e937be020431f7586b0cf4b51572"
+    },
+    {
+      "file": "icon-resize-grip.png",
+      "region": {
+        "action": "resize-grip",
+        "x": 577.5,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "f0b61c7105692f268e84599b9d1b16e1f4162256d273cc336a9a7447d38c87c9"
+    },
+    {
+      "file": "icon-tile-narrower.png",
+      "region": {
+        "action": "tile-narrower",
+        "x": 12,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "c292c90abf3f43ad91f42688c76d014bdff4179a35dbbb9769d2add33d04addb"
+    },
+    {
+      "file": "icon-tile-wider.png",
+      "region": {
+        "action": "tile-wider",
+        "x": 38,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "856055d339238ebf16401a7c822c89c36e010aea0c415270b14b1a5acaa5a941"
+    },
+    {
+      "file": "icon-menu-actions.png",
+      "region": {
+        "action": "menu-actions",
+        "x": 944,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "57708115370f491958df9a0c849ac9f20db62adee1e4e4721367b970054b165c"
+    },
+    {
+      "file": "icon-shelf.png",
+      "region": {
+        "action": "shelf",
+        "x": 970,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "a02116a58ac97585402a5e6e26fd743b2a1d7138190d99f698e19bfded9d8cab"
+    },
+    {
+      "file": "icon-menu-workspace.png",
+      "region": {
+        "action": "menu-workspace",
+        "x": 996,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "e7e3fb7fdbd498129b7624d28de092338868a01bce190c1439ebe5f7c27a7e93"
+    },
+    {
+      "file": "icon-fullscreen.png",
+      "region": {
+        "action": "fullscreen",
+        "x": 1022,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "1fb4681d4e2e380d57608cabb4f2ceda5fc1b086c335726e2cb6beafe5baf997"
+    },
+    {
+      "file": "icon-close.png",
+      "region": {
+        "action": "close",
+        "x": 1048,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "e295eb2895b4612d54166c2665ba91542cc75591664e9ff221e1300f64d77e55"
+    },
+    {
+      "file": "desktop.png",
+      "region": null,
+      "padding": 0,
+      "pixelWidth": 2560,
+      "pixelHeight": 1600,
+      "sha256": "49352f2598c79d30acd6ae7732e5d25fd92146539269b87e57403f5a549eabc4"
+    },
+    {
+      "file": "bar-navigation.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "width": 180,
+        "height": 26
+      },
+      "padding": 0,
+      "pixelWidth": 360,
+      "pixelHeight": 52,
+      "sha256": "f9f3653ac73a06dac1e29a2e72a571281d8430b1a422bebe53215b9a3982e532"
+    },
+    {
+      "file": "window-actions.png",
+      "region": {
+        "x": 129,
+        "y": 72,
+        "width": 400,
+        "height": 353
+      },
+      "padding": 0,
+      "pixelWidth": 800,
+      "pixelHeight": 706,
+      "sha256": "8786b668a6d60956feb0c80a01620a85e5a23fd5b79f8dd68dc4d33ff56f498e"
+    },
+    {
+      "file": "workspaces.png",
+      "region": {
+        "x": 141,
+        "y": 72,
+        "width": 440,
+        "height": 358
+      },
+      "padding": 0,
+      "pixelWidth": 880,
+      "pixelHeight": 716,
+      "sha256": "15697179b6372498ae0ecda4ffa0a6d3e0a2741b84e5ddc2b4df2c31705349d4"
+    },
+    {
+      "file": "dwindle-resize.png",
+      "region": {
+        "x": 357,
+        "y": 72,
+        "width": 440,
+        "height": 385
+      },
+      "padding": 0,
+      "pixelWidth": 880,
+      "pixelHeight": 770,
+      "sha256": "d1d1e564852bdd46d6514abeb22bc02ca989e563a908a3e304d61570853cfe16"
+    },
+    {
+      "file": "resize-tooltip.png",
+      "region": {
+        "visible": true,
+        "action": "resize-grip",
+        "text": "Click for size controls; hold and drag to resize",
+        "output": "HEADLESS-GOOEY",
+        "x": 200,
+        "y": 70,
+        "width": 340,
+        "height": 46
+      },
+      "padding": 0,
+      "pixelWidth": 680,
+      "pixelHeight": 92,
+      "sha256": "2e7ec3f21e49f6f8b0da6adeaf0a838a262466a4b9d7878aa2a6236578927d4d"
+    },
+    {
+      "file": "launcher.png",
+      "region": {
+        "x": 5,
+        "y": 31,
+        "width": 360,
+        "height": 669
+      },
+      "padding": 0,
+      "pixelWidth": 720,
+      "pixelHeight": 1338,
+      "sha256": "70e66bb68c9bef3dea785898b6080b4d6ebb8d9966bb9476a576c8de70c97665"
+    },
+    {
+      "file": "bar-launcher.png",
+      "region": {
+        "x": 8,
+        "y": 0,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "6db5ff000b85f3482c97acd13f6c0f308c5525396b83362190122778d764a7bf"
+    },
+    {
+      "file": "style-gooey.png",
+      "region": {
+        "x": 5,
+        "y": 31,
+        "width": 360,
+        "height": 616
+      },
+      "padding": 0,
+      "pixelWidth": 720,
+      "pixelHeight": 1232,
+      "sha256": "b00ae3e78609104491e24d9b16bd4a1da7ef9fd35393bf57c65783370888e3b2"
+    },
+    {
+      "file": "style-gooey-toggle.png",
+      "region": {
+        "x": 25,
+        "y": 577,
+        "width": 320,
+        "height": 50
+      },
+      "padding": 0,
+      "pixelWidth": 640,
+      "pixelHeight": 100,
+      "sha256": "4550e904792f6a26a8f61ec558f308ac5caf867812c3bb11ab50602f56085a1a"
+    },
+    {
+      "file": "dwindle-vertical-frame.png",
+      "region": {
+        "x": 12,
+        "y": 38,
+        "width": 1256,
+        "height": 26
+      },
+      "padding": 0,
+      "pixelWidth": 2512,
+      "pixelHeight": 52,
+      "sha256": "546b120d86795ca460465b6163266023fd1f842606e123f7434e3c5f8952116f"
+    },
+    {
+      "file": "icon-tile-shorter.png",
+      "region": {
+        "action": "tile-shorter",
+        "x": 12,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "3ceacfee073b2eadf5970770d44c72be793f58419a0030ab380e6c86519a0f57"
+    },
+    {
+      "file": "icon-tile-taller.png",
+      "region": {
+        "action": "tile-taller",
+        "x": 38,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "d4796cfa69071ff2120b5f9231884854e00521a3cafc6ed9a482277c406a3f7a"
+    },
+    {
+      "file": "scrolling-frame.png",
+      "region": {
+        "x": 12,
+        "y": 38,
+        "width": 1062,
+        "height": 26
+      },
+      "padding": 0,
+      "pixelWidth": 2124,
+      "pixelHeight": 52,
+      "sha256": "fc0efd69f5672362f9bd4390e81d6d9e6ea4c711ca61694bb07898a6cd1d5b6d"
+    },
+    {
+      "file": "icon-column-half.png",
+      "region": {
+        "action": "column-half",
+        "x": 12,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "c99776c8e48fa0e3d63e259c3d350052e3c6684bda6fbfcaca057f1103b352e7"
+    },
+    {
+      "file": "icon-column-85.png",
+      "region": {
+        "action": "column-85",
+        "x": 38,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "c34dc022b8737c1486bf7d8e4d205b22848f8dda602343044fa1b93f2446d9ae"
+    },
+    {
+      "file": "icon-column-full.png",
+      "region": {
+        "action": "column-full",
+        "x": 64,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "22b705fd11bbb98991e1c7bcf1673540bc9341838a0d3ec5091f4144fbaa63ed"
+    },
+    {
+      "file": "scrolling-controls.png",
+      "region": {
+        "x": 578,
+        "y": 72,
+        "width": 440,
+        "height": 407
+      },
+      "padding": 0,
+      "pixelWidth": 880,
+      "pixelHeight": 814,
+      "sha256": "5f5e2e33cba36161f9960b624ff92b51c1492cb6eb5f0104cbd2a49deb7ce13d"
+    },
+    {
+      "file": "icon-unshelf.png",
+      "region": {
+        "action": "shelf",
+        "x": 849,
+        "y": 38,
+        "width": 26,
+        "height": 26
+      },
+      "padding": 2,
+      "pixelWidth": 60,
+      "pixelHeight": 60,
+      "sha256": "ad4bd771d0ce17e2039044ffb9d36230fc2ee9795d7ff7f3bd4db35088217ce7"
+    },
+    {
+      "file": "shelf.png",
+      "region": {
+        "x": 12,
+        "y": 38,
+        "width": 440,
+        "height": 276
+      },
+      "padding": 0,
+      "pixelWidth": 880,
+      "pixelHeight": 552,
+      "sha256": "6366ad042513041a2369cef5b804cf8af454131c35bf6f971a03c250f6242320"
+    }
+  ],
+  "applicationSource": "7ffec4b"
+}

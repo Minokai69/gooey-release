@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "gooey.launcher",
+  "name": "Gooey launcher",
+  "version": "0.1.0",
+  "author": "Gooey contributors; based on Omarchy",
+  "description": "Omarchy menu and applications anchored to the logo button",
+  "kinds": [
+    "menu",
+    "bar-widget",
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "menu": "Menu.qml",
+    "barWidget": "BarWidget.qml",
+    "service": "AnchorService.qml"
+  },
+  "barWidget": {
+    "displayName": "Gooey launcher",
+    "description": "Open applications and desktop actions beside the Omarchy logo",
+    "category": "Compositor",
+    "allowMultiple": false
+  }
+}

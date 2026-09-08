@@ -1,0 +1,419 @@
+#!/usr/bin/env python3
+"""Stage Gooey releases into an explicitly selected user home.
+
+This command does not control the compositor or restart the desktop. Initial
+activation is tested through dev/stage and the nested preview.
+"""
+import argparse
+import copy
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parent
+IDS = ('gooey.launcher', 'gooey.window-tools')
+SECTIONS = ('left', 'center', 'right')
+RELEASE_NAME = re.compile(r'0\.1\.0-dev-[0-9a-f]{12}')
+
+
+def read(path, default=None):
+    return json.loads(path.read_text()) if path.exists() else default
+
+
+def atomic_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp = tempfile.mkstemp(prefix='.gooey-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as out:
+            json.dump(value, out, indent=2)
+            out.write('\n')
+        os.replace(temp, path)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+def swap_link(path, target):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and not path.is_symlink():
+        raise RuntimeError(f'Refusing to replace an unowned directory: {path}')
+    temp = path.with_name(path.name + '.gooey-next')
+    if temp.exists() or temp.is_symlink():
+        raise RuntimeError(f'A pending activation path already exists: {temp}')
+    try:
+        temp.symlink_to(target)
+        os.replace(temp, path)
+    finally:
+        if temp.is_symlink():
+            temp.unlink()
+
+
+def locations(home):
+    return home / '.local/share/gooey', home / '.config/omarchy/shell.json'
+
+
+def validate_config(config):
+    if not isinstance(config, dict) or config.get('version') != 1:
+        raise RuntimeError('Expected an existing Omarchy shell.json version 1.')
+    bar = config.get('bar', {})
+    if not isinstance(bar, dict) or not isinstance(bar.get('layout', {}), dict):
+        raise RuntimeError('Expected bar.layout to be an object.')
+    layout = bar.get('layout', {})
+    for name, entries in list(layout.items()) + [('plugins', config.get('plugins', []))]:
+        if not isinstance(entries, list) or any(not isinstance(e, dict) or not isinstance(e.get('id'), str) for e in entries):
+            raise RuntimeError(f'Expected {name} to contain plugin entry objects with string IDs.')
+    disabled = config.get('disabledPlugins', [])
+    if not isinstance(disabled, list) or any(not isinstance(e, str) for e in disabled):
+        raise RuntimeError('Expected disabledPlugins to contain string IDs.')
+    return config
+
+
+def validate_plugins(plugins):
+    for plugin_id in IDS:
+        folder = plugins / plugin_id
+        if not folder.is_dir() or folder.is_symlink():
+            raise RuntimeError(f'Missing plugin directory: {plugin_id}')
+        for path in folder.rglob('*'):
+            if path.is_symlink():
+                raise RuntimeError(f'Plugin payloads must not contain symlinks: {path}')
+        manifest = read(folder / 'manifest.json')
+        if not isinstance(manifest, dict) or manifest.get('id') != plugin_id:
+            raise RuntimeError(f'Missing or invalid plugin {plugin_id}')
+        entries = manifest.get('entryPoints')
+        if not isinstance(entries, dict) or not entries:
+            raise RuntimeError(f'Plugin has no entry points: {plugin_id}')
+        for entry in entries.values():
+            if not isinstance(entry, str):
+                raise RuntimeError(f'Invalid plugin entry point: {entry!r}')
+            path = folder / entry
+            if not path.resolve().is_relative_to(folder.resolve()) or not path.is_file():
+                raise RuntimeError(f'Invalid plugin entry point: {entry}')
+
+
+def validate_release(data, version):
+    if not isinstance(version, str) or not RELEASE_NAME.fullmatch(version):
+        raise RuntimeError('Invalid staged release name.')
+    release = data / 'releases' / version
+    if release.is_symlink() or not release.is_dir():
+        raise RuntimeError('The staged release directory is missing or is a symlink.')
+    manifest = read(release / 'release.json')
+    if not isinstance(manifest, dict) or manifest.get('version') != version or manifest.get('plugins') != list(IDS):
+        raise RuntimeError('The staged release manifest is invalid.')
+    files = manifest.get('files')
+    if not isinstance(files, dict) or not files:
+        raise RuntimeError('This development release has no integrity manifest; stage a fresh release.')
+    if any(p.is_symlink() for p in release.rglob('*')):
+        raise RuntimeError('The staged release must not contain symlinks.')
+    actual = {str(p.relative_to(release)) for p in release.rglob('*') if p.is_file() and p != release / 'release.json'}
+    if actual != set(files):
+        raise RuntimeError('The staged release file set is incomplete or changed.')
+    for name, expected in files.items():
+        path = release / name
+        if path.is_symlink() or not path.resolve().is_relative_to(release.resolve()) or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            raise RuntimeError(f'The staged release failed its integrity check: {name}')
+    validate_plugins(release / 'plugins')
+    build = read(release / 'companion/build-info.json')
+    binary = release / 'companion/gooey.so'
+    if not isinstance(build, dict) or not binary.is_file() or build.get('sha256') != hashlib.sha256(binary.read_bytes()).hexdigest():
+        raise RuntimeError('Companion binary does not match its build metadata.')
+    if manifest.get('build') != build:
+        raise RuntimeError('Companion build metadata differs from the release manifest.')
+    return release
+
+
+def snapshot(path):
+    if path.is_symlink():
+        return ('link', os.readlink(path))
+    if path.exists():
+        if not path.is_file():
+            raise RuntimeError(f'Refusing to replace an existing directory: {path}')
+        return ('file', path.read_bytes(), path.stat().st_mode & 0o777)
+    return ('absent',)
+
+
+def restore_snapshot(path, state):
+    if snapshot(path) == state:
+        return
+    if state[0] == 'absent':
+        if path.is_file() or path.is_symlink():
+            path.unlink()
+    elif state[0] == 'link':
+        swap_link(path, state[1])
+    else:
+        fd, temp = tempfile.mkstemp(prefix='.gooey-restore-', dir=path.parent)
+        try:
+            with os.fdopen(fd, 'wb') as out:
+                out.write(state[1])
+                os.fchmod(out.fileno(), state[2])
+            os.replace(temp, path)
+        finally:
+            if os.path.exists(temp):
+                os.unlink(temp)
+
+
+def transaction(paths, action):
+    states = [(path, snapshot(path)) for path in paths]
+    try:
+        action()
+    except Exception as original:
+        errors = []
+        for path, state in reversed(states):
+            try:
+                restore_snapshot(path, state)
+            except Exception as error:
+                errors.append(f'{path}: {error}')
+        if errors:
+            raise RuntimeError(f'Activation failed ({original}); recovery also failed: {"; ".join(errors)}') from original
+        raise
+
+
+def select_config(config):
+    selected = copy.deepcopy(validate_config(config))
+    layout = selected.setdefault('bar', {}).setdefault('layout', {})
+    for section in SECTIONS:
+        layout.setdefault(section, [])
+    changes = []
+    present = {entry['id'] for entries in layout.values() for entry in entries}
+    for plugin_id in IDS:
+        if plugin_id in present:
+            continue
+        installed = {'id': plugin_id}
+        before = None
+        if plugin_id == IDS[0]:
+            location = next(((section, i) for section in SECTIONS for i, e in enumerate(layout[section]) if e['id'] == 'omarchy.menu'), None)
+            if location:
+                section, index = location
+                before = layout[section][index]
+                layout[section][index] = installed
+            else:
+                layout['left'].insert(0, installed)
+        else:
+            layout['left'].append(installed)
+        changes.append({'kind': 'layout', 'before': before, 'installed': installed})
+    enabled = selected.setdefault('plugins', [])
+    for plugin_id in IDS:
+        if not any(e['id'] == plugin_id for e in enabled):
+            installed = {'id': plugin_id}
+            enabled.append(installed)
+            changes.append({'kind': 'plugins', 'before': None, 'installed': installed})
+    return selected, changes
+
+
+def owned_changes(saved, config):
+    if not saved:
+        return []
+    if not isinstance(saved, dict):
+        raise RuntimeError('Invalid activation ownership record.')
+    if saved.get('schemaVersion') == 2:
+        changes = saved.get('changes', [])
+    elif isinstance(saved.get('before'), dict):
+        # Migrate the initial private-home prototype's activation record.
+        _, changes = select_config(saved['before'])
+    else:
+        raise RuntimeError('Unrecognized activation record; refusing to guess restoration changes.')
+    pools = {'layout': [copy.deepcopy(e) for entries in config.get('bar', {}).get('layout', {}).values() for e in entries],
+             'plugins': copy.deepcopy(config.get('plugins', []))}
+    retained = []
+    for change in changes:
+        if not isinstance(change, dict) or change.get('kind') not in pools or not isinstance(change.get('installed'), dict):
+            raise RuntimeError('Invalid activation ownership record.')
+        pool = pools[change['kind']]
+        if change['installed'] in pool:
+            pool.remove(change['installed'])
+            retained.append(change)
+    return retained
+
+
+def install(home):
+    plugins = ROOT / 'experience/plugins'
+    validate_plugins(plugins)
+    companion = ROOT / 'companions/hyprland/build/gooey.so'
+    metadata = ROOT / 'companions/hyprland/build/build-info.json'
+    if not companion.is_file() or not metadata.is_file():
+        raise RuntimeError('Build the Hyprland companion before staging a release.')
+    data, _ = locations(home)
+    releases = data / 'releases'
+    releases.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix='.staging-', dir=releases))
+    try:
+        for plugin_id in IDS:
+            shutil.copytree(plugins / plugin_id, stage / 'plugins' / plugin_id)
+        (stage / 'companion').mkdir()
+        shutil.copy2(companion, stage / 'companion/gooey.so')
+        shutil.copy2(metadata, stage / 'companion/build-info.json')
+        shutil.copy2(ROOT / 'LICENSE', stage / 'LICENSE-OMARCHY')
+        native_license = ROOT / 'companions/hyprland/LICENSE.upstream'
+        if native_license.exists():
+            shutil.copy2(native_license, stage / 'LICENSE-COMPANION')
+        validate_plugins(stage / 'plugins')
+        build = read(stage / 'companion/build-info.json')
+        if not isinstance(build, dict) or build.get('sha256') != hashlib.sha256((stage / 'companion/gooey.so').read_bytes()).hexdigest():
+            raise RuntimeError('Companion binary does not match its build metadata; rebuild it.')
+        files = {str(path.relative_to(stage)): hashlib.sha256(path.read_bytes()).hexdigest()
+                 for path in sorted(stage.rglob('*')) if path.is_file()}
+        version = '0.1.0-dev-' + hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()[:12]
+        release = releases / version
+        atomic_json(stage / 'release.json', {'version': version, 'plugins': list(IDS), 'build': build, 'files': files})
+        if release.exists() or release.is_symlink():
+            validate_release(data, version)
+        else:
+            os.replace(stage, release)
+        validate_release(data, version)
+    finally:
+        if stage.exists():
+            shutil.rmtree(stage)
+    atomic_json(data / 'staged.json', {'version': version})
+    print(f'Staged {version}')
+
+
+def activate(home):
+    data, config_path = locations(home)
+    stage = read(data / 'staged.json')
+    if not stage:
+        raise RuntimeError('No staged release. Run install first.')
+    version = stage['version']
+    validate_release(data, version)
+    if config_path.is_symlink():
+        raise RuntimeError('The private prototype does not replace a symlinked shell.json.')
+    config = validate_config(read(config_path))
+    if any(plugin_id in config.get('disabledPlugins', []) for plugin_id in IDS):
+        raise RuntimeError('An Gooey plugin is explicitly disabled in this profile; resolve that setting first.')
+    selected, added_changes = select_config(config)
+    backup = data / 'activation.json'
+    if backup.is_symlink():
+        raise RuntimeError('Activation record must not be a symlink.')
+    changes = owned_changes(read(backup), config) + added_changes
+    record = {'schemaVersion': 2, 'version': version, 'changes': changes}
+    registry = home / '.config/omarchy/plugins'
+    for plugin_id in IDS:
+        dest = registry / plugin_id
+        expected = os.path.relpath(data / 'current/plugins' / plugin_id, registry)
+        if dest.is_symlink() and os.readlink(dest) != expected:
+            raise RuntimeError(f'Plugin link is owned by someone else: {dest}')
+        if dest.exists() and not dest.is_symlink():
+            raise RuntimeError(f'Plugin directory is owned by someone else: {dest}')
+    current = data / 'current'
+    previous = data / 'previous'
+    for link in (current, previous):
+        if link.is_symlink():
+            target = os.readlink(link)
+            if not target.startswith('releases/') or not RELEASE_NAME.fullmatch(target[len('releases/'):]):
+                raise RuntimeError(f'Release link is owned by someone else: {link}')
+        elif link.exists():
+            raise RuntimeError(f'Refusing to replace an existing release directory: {link}')
+    paths = [current, previous, *(registry / plugin_id for plugin_id in IDS), backup, config_path]
+
+    def apply():
+        if current.is_symlink() and os.readlink(current) != 'releases/' + version:
+            swap_link(previous, os.readlink(current))
+        swap_link(current, 'releases/' + version)
+        for plugin_id in IDS:
+            swap_link(registry / plugin_id, os.path.relpath(current / 'plugins' / plugin_id, registry))
+        atomic_json(backup, record)
+        atomic_json(config_path, selected)
+
+    transaction(paths, apply)
+    print(f'Selected {version}; no host process or keybinding was changed.')
+
+
+def restore(home):
+    data, config_path = locations(home)
+    saved = read(data / 'activation.json')
+    if not saved:
+        print('No Gooey activation to restore.')
+        return
+    if config_path.is_symlink():
+        raise RuntimeError('The private prototype does not replace a symlinked shell.json.')
+    config = validate_config(read(config_path))
+    changes = owned_changes(saved, config)
+    for change in changes:
+        lists = list(config.get('bar', {}).get('layout', {}).values()) if change['kind'] == 'layout' else [config.get('plugins', [])]
+        for entries in lists:
+            if change['installed'] not in entries:
+                continue
+            index = entries.index(change['installed'])
+            if change.get('before') is None:
+                entries.pop(index)
+            else:
+                entries[index] = change['before']
+            break
+
+    def apply():
+        atomic_json(config_path, config)
+        (data / 'activation.json').unlink()
+
+    transaction([data / 'activation.json', config_path], apply)
+    print('Restored owned unchanged entries; pre-existing and subsequently edited entries were preserved.')
+
+
+def rollback(home):
+    data, _ = locations(home)
+    previous = data / 'previous'
+    if not previous.is_symlink():
+        raise RuntimeError('No previous release.')
+    version = Path(os.readlink(previous)).name
+    validate_release(data, version)
+
+    def apply():
+        atomic_json(data / 'staged.json', {'version': version})
+        activate(home)
+
+    transaction([data / 'staged.json'], apply)
+
+
+def uninstall(home):
+    data, _ = locations(home)
+    restore(home)
+    _, config_path = locations(home)
+    config = validate_config(read(config_path))
+    retained = [e for entries in config.get('bar', {}).get('layout', {}).values() for e in entries]
+    retained += config.get('plugins', [])
+    if any(entry['id'] in IDS for entry in retained):
+        print('Kept release files and registrations because preserved current settings still use Gooey.')
+        return
+    registry = home / '.config/omarchy/plugins'
+    for plugin_id in IDS:
+        link = registry / plugin_id
+        expected = os.path.relpath(data / 'current/plugins' / plugin_id, registry)
+        if link.is_symlink() and os.readlink(link) == expected:
+            link.unlink()
+    for name in ('current', 'previous'):
+        link = data / name
+        if link.is_symlink() and os.readlink(link).startswith('releases/0.1.0-dev-'):
+            link.unlink()
+    for release in (data / 'releases').glob('0.1.0-dev-*'):
+        manifest = read(release / 'release.json', {})
+        if not release.is_symlink() and manifest.get('plugins') == list(IDS) and manifest.get('version') == release.name:
+            shutil.rmtree(release)
+    staged = data / 'staged.json'
+    if staged.exists():
+        staged.unlink()
+    print('Removed owned release files and plugin registrations; user preferences remain.')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('command', choices=['install', 'activate', 'restore', 'rollback', 'uninstall', 'status'])
+    parser.add_argument('--home', type=Path, required=True, help='Explicit target home (use .devhome for development).')
+    args = parser.parse_args()
+    home = args.home.expanduser().resolve()
+    if not home.is_dir():
+        parser.error('Target home must already exist.')
+    if args.command == 'status':
+        data, _ = locations(home)
+        print(json.dumps({'staged': read(data / 'staged.json'), 'active': os.readlink(data / 'current') if (data / 'current').is_symlink() else None, 'selected': (data / 'activation.json').exists()}, indent=2))
+    else:
+        globals()[args.command](home)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (RuntimeError, OSError, ValueError, KeyError) as exc:
+        print(f'gooey: {exc}', file=sys.stderr)
+        sys.exit(1)

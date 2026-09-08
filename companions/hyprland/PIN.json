@@ -1,0 +1,17 @@
+{
+  "upstreamRepository": "https://github.com/hyprwm/hyprland-plugins",
+  "upstreamCommit": "7644cecdb947060682891a0db2a0cdc5c0b9e704",
+  "upstreamComponent": "hyprbars",
+  "sourceArchiveSha256": "46b76d4c9f020273c50dba1bb816387e38e8e3b64d8fa33baa971d009b9de89f",
+  "hyprlandVersion": "0.56.2",
+  "hyprlandCommit": "efb50993780079460b0cbed1363e2166a2de1d9f",
+  "license": "BSD-3-Clause",
+  "localChanges": [
+    "Native owner-bound action registry and instance-checked JSON IPC",
+    "Shelf reuses special:scratchpad",
+    "Quickshell per-window menu bridge",
+    "Release-to-activate buttons with drag cancellation",
+    "Native move and resize grips; no synthetic keyboard input",
+    "Namespaced configuration and window rules"
+  ]
+}

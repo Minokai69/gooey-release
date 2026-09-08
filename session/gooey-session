@@ -1,0 +1,508 @@
+#!/usr/bin/env python3
+"""Gooey personal-session integration. No system-owned files are changed."""
+import argparse
+import datetime
+import fcntl
+import hashlib
+import json
+import os
+import re
+from pathlib import Path
+import runpy
+import shlex
+import subprocess
+import sys
+import tempfile
+import time
+
+HERE = Path(__file__).resolve().parent
+CORE = runpy.run_path(str(HERE / 'package.py' if (HERE / 'package.py').exists() else HERE.parent / 'gooey'))
+BEGIN = '-- BEGIN GOOEY SESSION\n'
+END = '-- END GOOEY SESSION\n'
+BLOCK = BEGIN + 'require("hypr.gooey")\n' + END
+
+
+class ShellUnavailable(RuntimeError):
+    pass
+
+
+def run(*args, check=True):
+    proc = subprocess.run([str(a) for a in args], capture_output=True, text=True, timeout=15)
+    if check and proc.returncode:
+        raise RuntimeError(f'{args[0]}: {proc.stdout.strip()} {proc.stderr.strip()}')
+    return proc.stdout.strip() if check else proc
+
+
+def read(path, default=None):
+    return CORE['read'](path, default)
+
+
+def write(path, text, mode=0o600):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix='.gooey-session-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            stream.write(text)
+            os.fchmod(stream.fileno(), mode)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def remove_block(text):
+    if BEGIN not in text and END not in text:
+        return text
+    if text.count(BEGIN) != 1 or text.count(END) != 1 or BLOCK not in text:
+        raise RuntimeError('The Gooey startup block was edited; refusing to overwrite it.')
+    return text.replace(BLOCK, '', 1)
+
+
+def add_block(text):
+    if BLOCK in text:
+        remove_block(text)  # Validate ownership, including duplicate markers.
+        return text
+    remove_block(text)
+    return text + ('' if text.endswith('\n') else '\n') + BLOCK
+
+
+def module_text(home):
+    command = shlex.quote(str(home / '.local/bin/gooey'))
+    active = json.dumps(str(home / '.local/share/gooey/activation.json'))
+    return ('-- Owned by Gooey. Use `gooey disable` to restore the stock experience.\n'
+            f'local selected = io.open({active}, "r")\n'
+            'if selected then\n'
+            '  selected:close()\n'
+            '  hl.unbind("SUPER + Super_R")\n'
+            f'  o.bind("SUPER + Super_R", "Gooey menu", {json.dumps(command + " menu")}, {{ release = true }})\n'
+            f'  o.exec_on_start({json.dumps(command + " start")})\n'
+            'end\n')
+
+
+def paths(home):
+    data = home / '.local/share/gooey'
+    return data, home / '.config/hypr/hyprland.lua', home / '.config/hypr/gooey.lua'
+
+
+def shell(*args):
+    return run('omarchy', 'shell', *args)
+
+
+def unlocked(allow_missing_shell=False):
+    monitors = json.loads(run('hyprctl', '-j', 'monitors'))
+    if not monitors or any('LOCK' in m.get('solitaryBlockedBy', []) for m in monitors):
+        raise RuntimeError('Session is locked or unavailable; unlock before switching Gooey.')
+    if not any('WORKSPACE' not in m.get('solitaryBlockedBy', ['WORKSPACE']) for m in monitors):
+        raise RuntimeError('Cannot establish compositor lock state.')
+    try:
+        response = shell('lock', 'status')
+    except RuntimeError as error:
+        if allow_missing_shell:
+            return
+        raise ShellUnavailable(str(error)) from error
+    state = json.loads(response)
+    if not isinstance(state, dict) or any(type(state.get(key)) is not bool for key in ('secure', 'requested')):
+        raise RuntimeError('Cannot establish shell lock state.')
+    if any(state.get(key) for key in ('locked', 'requested', 'pending', 'sessionLocked', 'secure')):
+        raise RuntimeError('The lock screen is active or starting; unlock before switching Gooey.')
+
+
+def context(home):
+    if home != Path.home().resolve() or os.environ.get('OMARCHY_MOUSE_PREVIEW'):
+        raise RuntimeError('Session commands require the current real user home; use dev/run for preview.')
+    if not os.environ.get('HYPRLAND_INSTANCE_SIGNATURE') or not os.environ.get('WAYLAND_DISPLAY'):
+        raise RuntimeError('Run this command from the intended Hyprland session.')
+    if Path(os.environ.get('OMARCHY_PATH', '/usr/share/omarchy')).resolve() != Path('/usr/share/omarchy'):
+        raise RuntimeError('This personal-session release requires the installed Omarchy host.')
+
+
+def compatible(home, release):
+    data, _, _ = paths(home)
+    expected = read(data / 'runtime/compatibility.json')
+    if not expected:
+        raise RuntimeError('Deploy the session runtime before activation.')
+    version = json.loads(run('hyprctl', '-j', 'version'))
+    build = read(release / 'companion/build-info.json')
+    if version.get('commit') != build['hyprlandCommit'] or version.get('version') != build['hyprlandVersion']:
+        raise RuntimeError('Hyprland changed. Rebuild and validate Gooey before enabling it.')
+    if run('pacman', '-Q', 'omarchy') != expected['package']:
+        raise RuntimeError('Omarchy changed. Validate the new host before enabling this release.')
+    if run('quickshell', '--version') != expected['quickshell']:
+        raise RuntimeError('Quickshell changed. Validate it before enabling this release.')
+    for name, sha in expected['files'].items():
+        file = Path('/usr/share/omarchy') / name
+        if not file.is_file() or digest(file) != sha:
+            raise RuntimeError(f'The tested Omarchy host changed: {name}')
+    return version
+
+
+def selected_release(home, staged=False):
+    data, _, _ = paths(home)
+    name = read(data / 'staged.json')['version'] if staged else (data / 'current').resolve().name
+    return CORE['validate_release'](data, name)
+
+
+def plugin_list():
+    return json.loads(run('hyprctl', '-j', 'plugin', 'list'))
+
+
+def preflight(home):
+    context(home)
+    unlocked()
+    data, main, module = paths(home)
+    if not main.is_file() or main.is_symlink():
+        raise RuntimeError('Expected a regular user hyprland.lua.')
+    remove_block(main.read_text())
+    if module.is_symlink() or (module.exists() and module.read_text() != module_text(home)):
+        raise RuntimeError('hypr/gooey.lua is not owned by this integration.')
+    config = CORE['validate_config'](read(home / '.config/omarchy/shell.json'))
+    if (home / '.config/omarchy/shell.json').is_symlink():
+        raise RuntimeError('Refusing a symlinked shell.json.')
+    release = selected_release(home, staged=True)
+    version = compatible(home, release)
+    loaded = plugin_list()
+    if any(p.get('name', '').lower() == 'hyprbars' for p in loaded):
+        raise RuntimeError('Unload the other hyprbars companion before enabling Gooey.')
+    record = read(data / 'native.json') or read(data / 'session.json', {})
+    if any(p.get('name') == 'gooey' for p in loaded):
+        if (record.get('loadedPath') != str(release / 'companion/gooey.so')
+                or record.get('instance') != os.environ['HYPRLAND_INSTANCE_SIGNATURE']):
+            raise RuntimeError('A different Gooey binary is loaded. Disable before switching releases.')
+    binds = json.loads(run('hyprctl', '-j', 'binds'))
+    if any(b.get('key', '').lower() == 'super_r' and b.get('description') != 'Gooey menu' for b in binds):
+        raise RuntimeError('Right Super already has a custom binding; resolve that conflict before enabling.')
+    if run('hyprctl', 'configerrors').strip():
+        raise RuntimeError('Fix existing Hyprland configuration errors before enabling Gooey.')
+    return release, version, config
+
+
+def reload_hypr():
+    run('hyprctl', 'reload')
+    errors = run('hyprctl', 'configerrors')
+    if errors:
+        raise RuntimeError(f'Hyprland config errors: {errors}')
+
+
+def wait_unlocked():
+    deadline = time.monotonic() + 10
+    while True:
+        try:
+            unlocked()
+            return
+        except ShellUnavailable:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(.2)
+
+
+def refresh_shell():
+    # Registering plugin links triggers Omarchy's own asynchronous rescan.
+    # Let its lock service return before requesting another explicit rescan.
+    wait_unlocked()
+    shell('shell', 'reloadConfig')
+    shell('shell', 'rescanPlugins')
+
+
+def wait_ready():
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        try:
+            launcher = json.loads(shell('gooey.launcher', 'status'))
+            windows = json.loads(shell('gooey.window-tools', 'status'))
+            native = json.loads(run('hyprctl', 'gooey:state'))
+            themed = not native.get('decorationMode') or (
+                native.get('theme', {}).get('ready') and windows.get('theme', {}).get('synced'))
+            if themed and windows.get('ready') and native.get('instance') == os.environ['HYPRLAND_INSTANCE_SIGNATURE'] and isinstance(launcher, dict):
+                return
+        except (RuntimeError, ValueError):
+            pass
+        time.sleep(.25)
+    raise RuntimeError('Gooey did not become ready.')
+
+
+def load_native(home, release):
+    data, _, _ = paths(home)
+    binary = release / 'companion/gooey.so'
+    if any(p.get('name') == 'gooey' for p in plugin_list()):
+        saved = read(data / 'native.json') or read(data / 'session.json', {})
+        if saved.get('loadedPath') != str(binary) or saved.get('instance') != os.environ['HYPRLAND_INSTANCE_SIGNATURE']:
+            raise RuntimeError('An unowned Gooey companion is already loaded.')
+        return
+    pending = data / 'load-pending.json'
+    if pending.exists():
+        raise RuntimeError('A previous native load was interrupted. Inspect it before retrying.')
+    # Independent of profile rollback: retain ownership if a later unload fails.
+    CORE['atomic_json'](data / 'native.json', {'loadedPath': str(binary), 'instance': os.environ['HYPRLAND_INSTANCE_SIGNATURE']})
+    CORE['atomic_json'](pending, {'binary': str(binary), 'instance': os.environ['HYPRLAND_INSTANCE_SIGNATURE']})
+    # Keep the marker if the compositor or loader is interrupted mid-load.
+    output = run('hyprctl', 'plugin', 'load', binary)
+    if output != 'ok' or not any(p.get('name') == 'gooey' for p in plugin_list()):
+        pending.unlink()
+        raise RuntimeError(f'Native load refused: {output}')
+    pending.unlink()
+
+
+def unload_native(home):
+    data, _, _ = paths(home)
+    if not any(p.get('name') == 'gooey' for p in plugin_list()):
+        return
+    saved = read(data / 'native.json') or read(data / 'session.json', {})
+    binary = saved.get('loadedPath')
+    if (not binary or not Path(binary).is_relative_to(data / 'releases')
+            or saved.get('instance') != os.environ['HYPRLAND_INSTANCE_SIGNATURE']):
+        raise RuntimeError('Cannot identify the exact owned native binary to unload.')
+    output = run('hyprctl', 'plugin', 'unload', binary)
+    if output != 'ok' or any(p.get('name') == 'gooey' for p in plugin_list()):
+        raise RuntimeError(f'Native unload failed: {output}')
+    (data / 'native.json').unlink(missing_ok=True)
+
+
+MENU_BEGIN = '// BEGIN GOOEY STYLE TOGGLE'
+MENU_END = '// END GOOEY STYLE TOGGLE'
+
+
+def parse_menu(text):
+    # Strip JSONC comments/trailing commas without touching quoted strings.
+    strings = r'"(?:\\.|[^"\\])*"'
+    clean = re.sub(strings + r'|//[^\n]*|/\*.*?\*/',
+                   lambda m: m[0] if m[0].startswith('"') else ' ', text, flags=re.S)
+    clean = re.sub(strings + r'|,\s*(?=[}\]])',
+                   lambda m: m[0] if m[0].startswith('"') else '', clean)
+    result = json.loads(clean)
+    if not isinstance(result, dict):
+        raise ValueError('Menu extension must be a JSONC object.')
+    return result
+
+
+def style_menu(text, command, owned_hash=None):
+    parsed = parse_menu(text)
+    row = {'icon': '󰍽', 'label': 'Gooey',
+           'description': 'Toggle mouse-friendly window controls',
+           'action': shlex.quote(str(command)) + ' toggle --notify',
+           'checked': shlex.quote(str(command)) + ' is-enabled'}
+    block = MENU_BEGIN + '\n  "style.gooey": ' + json.dumps(row, ensure_ascii=False) + ',\n  ' + MENU_END
+    if MENU_BEGIN in text or MENU_END in text:
+        if text.count(MENU_BEGIN) != 1 or text.count(MENU_END) != 1:
+            raise RuntimeError('The Gooey menu block is malformed; preserving it.')
+        start, end = text.index(MENU_BEGIN), text.index(MENU_END) + len(MENU_END)
+        if hashlib.sha256(text[start:end].encode()).hexdigest() != owned_hash:
+            raise RuntimeError('The Gooey menu entry was edited; preserving it.')
+        updated = text[:start] + block + text[end:]
+    else:
+        if 'style.gooey' in parsed:
+            raise RuntimeError('An unrelated style.gooey menu entry already exists.')
+        # Locate the opening object outside comments and strings.
+        tokens = re.finditer(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/|[{}]', text, re.S)
+        opening = next(m.end() for m in tokens if m[0] == '{')
+        updated = text[:opening] + '\n  ' + block + '\n' + text[opening:]
+    parse_menu(updated)
+    return updated, hashlib.sha256(block.encode()).hexdigest()
+
+
+def toggle(home):
+    data, _, _ = paths(home)
+    if (data / 'activation.json').exists():
+        disable(home)
+    else:
+        enable(home)
+
+
+def deploy(home):
+    root = HERE.parent
+    if not (root / 'UPSTREAM.json').is_file():
+        raise RuntimeError('Deploy from the reviewed source checkout, not the installed runtime.')
+    data, _, _ = paths(home)
+    runtime = data / 'runtime'
+    command = home / '.local/bin/gooey'
+    desktop = home / '.local/share/applications/gooey-restore.desktop'
+    ownership = read(data / 'runtime-files.json', {})
+    if command.is_symlink():
+        if command.resolve() != runtime / 'gooey-session':
+            raise RuntimeError('An unrelated gooey command already exists.')
+    elif command.exists():
+        raise RuntimeError('An unrelated gooey command already exists.')
+    upstream = read(root / 'HOST.json') or read(root / 'UPSTREAM.json')
+    compatibility = {**{key: upstream[key] for key in ('package', 'quickshell')},
+                     'files': {k: v for k, v in upstream['files'].items() if k.startswith('shell/')}}
+    payload = {'gooey-session': Path(__file__).read_text(), 'package.py': (root / 'gooey').read_text(),
+               'compatibility.json': json.dumps(compatibility, indent=2) + '\n'}
+    for name in payload:
+        path = runtime / name
+        if path.is_symlink() or (path.exists() and ownership.get(name) != digest(path)):
+            raise RuntimeError(f'Refusing to replace unowned runtime file: {path}')
+    if desktop.is_symlink() or (desktop.exists() and ownership.get('restoreDesktop') != digest(desktop)):
+        raise RuntimeError('An unrelated Gooey restore application entry exists.')
+    menu = home / '.config/omarchy/extensions/omarchy-menu.jsonc'
+    if menu.is_symlink():
+        raise RuntimeError('Refusing to modify a symlinked menu extension.')
+    menu_text, menu_hash = style_menu(menu.read_text() if menu.exists() else '{}\n',
+                                      command, ownership.get('styleMenuBlock'))
+    CORE['install'](home)
+    tracked = [*(runtime / n for n in payload), data / 'runtime-files.json', command, desktop, menu]
+    def apply():
+        for name, content in payload.items():
+            write(runtime / name, content, 0o755 if name == 'gooey-session' else 0o600)
+        write(desktop, '[Desktop Entry]\nType=Application\nName=Restore stock Omarchy\n'
+              'Comment=Turn off Gooey and restore your previous desktop controls\n'
+              'Icon=preferences-system-windows\nCategories=Settings;DesktopSettings;\n'
+              f'Exec={json.dumps(str(command).replace("%", "%%"))} disable --notify\nTerminal=false\n', 0o644)
+        write(menu, menu_text, 0o644)
+        CORE['atomic_json'](data / 'runtime-files.json', {**{n: digest(runtime / n) for n in payload},
+                                                       'restoreDesktop': digest(desktop), 'styleMenuBlock': menu_hash})
+        CORE['swap_link'](command, str(runtime / 'gooey-session'))
+    CORE['transaction'](tracked, apply)
+    print('Session runtime installed; run gooey enable --check to review, then gooey enable.')
+
+
+def enable(home, check=False):
+    release, version, config = preflight(home)
+    data, main, module = paths(home)
+    selected, changes = CORE['select_config'](config)
+    code_changed = (data / 'current').is_symlink() and (data / 'current').resolve() != release
+    print(json.dumps({'release': release.name, 'hyprland': version['version'], 'changes': changes,
+                      'startup': str(module), 'binding': 'Right Super: Gooey menu',
+                      'recovery': str(home / '.local/bin/gooey') + ' disable'}, indent=2))
+    if check:
+        return
+    backup = data / 'backups' / datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
+    backup.mkdir(parents=True, mode=0o700)
+    write(backup / 'shell.json', (home / '.config/omarchy/shell.json').read_text())
+    write(backup / 'hyprland.lua', main.read_text())
+    tracked = [main, module, data / 'session.json', data / 'activation.json', data / 'current', data / 'previous',
+               home / '.config/omarchy/shell.json', *(home / '.config/omarchy/plugins' / i for i in CORE['IDS'])]
+    was_loaded = any(p.get('name') == 'gooey' for p in plugin_list())
+    def apply():
+        CORE['atomic_json'](data / 'session.json', {'schemaVersion': 1, 'loadedPath': str(release / 'companion/gooey.so'),
+                                                  'instance': os.environ['HYPRLAND_INSTANCE_SIGNATURE'], 'backup': str(backup)})
+        try:
+            load_native(home, release)
+            unlocked()
+            CORE['activate'](home)
+            write(module, module_text(home))
+            write(main, add_block(main.read_text()), main.stat().st_mode & 0o777)
+            reload_hypr()
+            refresh_shell()
+            try:
+                if code_changed:
+                    # The plugin URLs stay constant across release symlink swaps.
+                    # A rescan can reuse old QML even when readiness succeeds.
+                    wait_unlocked()
+                    run('omarchy', 'restart', 'shell')
+                wait_ready()
+            except RuntimeError:
+                if code_changed:
+                    raise
+                # Omarchy's disabled QML file watcher can retain failed component
+                # loads from discovery. Its supported restart gives a fresh cache.
+                wait_unlocked()
+                run('omarchy', 'restart', 'shell')
+                wait_ready()
+        except Exception:
+            if not was_loaded:
+                unload_native(home)
+            raise
+    try:
+        CORE['transaction'](tracked, apply)
+    except Exception:
+        reload_hypr()
+        refresh_shell()
+        raise
+    print(f'Gooey is active. Backup: {backup}. Restore with: gooey disable')
+
+
+def disable(home):
+    context(home)
+    unlocked(allow_missing_shell=True)
+    data, main, module = paths(home)
+    cleaned = remove_block(main.read_text())
+    unload_native(home)
+    CORE['restore'](home)
+    write(main, cleaned, main.stat().st_mode & 0o777)
+    if module.is_file() and not module.is_symlink() and module.read_text() == module_text(home):
+        module.unlink()
+    reload_hypr()
+    try:
+        refresh_shell()
+    except RuntimeError:
+        # Official restart handles the stock lock service and supervision.
+        unlocked(allow_missing_shell=True)
+        run('omarchy', 'restart', 'shell')
+    print('Stock Omarchy selection restored. Applications and release backups were retained.')
+
+
+def start(home):
+    context(home)
+    data, _, _ = paths(home)
+    if not (data / 'activation.json').exists():
+        return
+    deadline = time.monotonic() + 25
+    while True:
+        try:
+            unlocked()
+            break
+        except (RuntimeError, ValueError):
+            if time.monotonic() > deadline:
+                raise RuntimeError('Gooey startup deferred: shell unavailable or session locked. Run gooey start after unlocking.')
+            time.sleep(.5)
+    try:
+        release = selected_release(home)
+        compatible(home, release)
+        if any(p.get('name', '').lower() == 'hyprbars' for p in plugin_list()):
+            raise RuntimeError('Another hyprbars companion is loaded.')
+        if not any(p.get('name') == 'gooey' for p in plugin_list()):
+            saved = read(data / 'session.json', {})
+            saved.update(loadedPath=str(release / 'companion/gooey.so'), instance=os.environ['HYPRLAND_INSTANCE_SIGNATURE'])
+            CORE['atomic_json'](data / 'session.json', saved)
+        load_native(home, release)
+        wait_ready()
+    except Exception as error:
+        disable(home)
+        run('notify-send', 'Gooey paused', f'{error} Stock Omarchy has been restored.', check=False)
+        raise
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('command', choices=('deploy', 'enable', 'disable', 'start', 'status', 'menu', 'toggle', 'is-enabled'))
+    parser.add_argument('--home', type=Path, default=Path.home())
+    parser.add_argument('--check', action='store_true', help='Review enable without changing the session.')
+    parser.add_argument('--notify', action='store_true', help='Show the result as a desktop notification.')
+    args = parser.parse_args()
+    home = args.home.expanduser().resolve()
+    data, _, _ = paths(home)
+    if args.command == 'is-enabled':
+        sys.exit(0 if (data / 'activation.json').exists() else 1)
+    if args.command == 'status':
+        print(json.dumps({'selected': (data / 'activation.json').exists(), 'session': read(data / 'session.json'),
+                          'native': read(data / 'native.json'),
+                          'loadPending': read(data / 'load-pending.json')}, indent=2))
+        return
+    if args.command == 'menu':
+        try:
+            shell('gooey.launcher', 'toggle', 'root')
+        except RuntimeError:
+            shell('shell', 'toggle', 'omarchy.menu', '{"menu":"root"}')
+        return
+    data.mkdir(parents=True, exist_ok=True)
+    with (data / '.session-operation.lock').open('w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.command == 'enable':
+            enable(home, args.check)
+        else:
+            globals()[args.command](home)
+    if args.notify:
+        run('notify-send', 'Gooey', 'Stock Omarchy restored.' if args.command == 'disable' else 'Operation completed.', check=False)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
+        print(f'gooey: {error}', file=sys.stderr)
+        if '--notify' in sys.argv:
+            run('notify-send', 'Gooey needs attention', str(error), check=False)
+        sys.exit(1)

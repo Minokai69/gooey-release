@@ -1,0 +1,4 @@
+# Use Omarchy's normal bar dimensions; the corner tab follows them directly.
+# This private profile is not part of the installed Gooey plugin payload.
+[font]
+base-size = 12

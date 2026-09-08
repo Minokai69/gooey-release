@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+mode=${1:-preview}
+GOOEY_TEST_HOST=${GOOEY_TEST_HOST:-/usr/share/omarchy}
+headless=0
+capture=0
+case "$mode" in
+  preview|smoke|integration|check-isolation) ;;
+  release-capture) mode=integration; headless=1; capture=1 ;;
+  integration-headless) mode=integration; headless=1 ;;
+  *) echo "Usage: $0 [preview|smoke|integration|integration-headless|release-capture|check-isolation]" >&2; exit 2 ;;
+esac
+for tool in bwrap dbus-run-session quickshell; do
+  command -v "$tool" >/dev/null || { echo "Missing dependency: $tool" >&2; exit 1; }
+done
+[[ "$HOME" == /home/* ]] || { echo "This launcher currently requires a /home user directory." >&2; exit 1; }
+# Keep HOME's normal value; mount private storage at that path inside bwrap.
+# Seed once: subsequent runs preserve development settings and edits.
+if [[ ! -d "$project_dir/.devhome" ]]; then
+  cp -a "$project_dir/seed" "$project_dir/.devhome"
+fi
+mkdir -p "$project_dir/.devhome/.cache" "$project_dir/.devhome/.local/share"
+mount_root=/opt/omarchy-mouse-shell
+runtime_dir=/run/user/$(id -u)
+args=(
+  --die-with-parent --new-session --unshare-all --cap-drop ALL
+  --ro-bind / / --tmpfs /home --tmpfs /root --tmpfs /tmp --tmpfs /run --tmpfs /opt
+  --proc /proc --dev /dev
+  --dir "$HOME" --bind "$project_dir/.devhome" "$HOME"
+  --ro-bind "$project_dir" "$mount_root"
+  --dir "$runtime_dir" --chmod 0700 "$runtime_dir"
+  --chdir "$mount_root" --clearenv
+  --setenv HOME "$HOME"
+  --setenv USER "$(id -un)" --setenv LOGNAME "$(id -un)"
+  --setenv PATH "$mount_root/base/bin:/usr/bin:/bin"
+  --setenv LANG "${LANG:-C.UTF-8}"
+  --setenv XDG_RUNTIME_DIR "$runtime_dir"
+  --setenv XDG_CONFIG_HOME "$HOME/.config"
+  --setenv XDG_STATE_HOME "$HOME/.local/state"
+  --setenv XDG_DATA_HOME "$HOME/.local/share"
+  --setenv XDG_CACHE_HOME "$HOME/.cache"
+  --setenv OMARCHY_PATH "$mount_root/base"
+  --setenv OMARCHY_MOUSE_PREVIEW 1
+  --setenv GOOEY_ROOT "$mount_root"
+  --setenv GOOEY_MODE "$mode"
+  --setenv GOOEY_HEADLESS "$headless"
+  --setenv GOOEY_CAPTURE_RELEASE "$capture"
+)
+# Optional reviewed host snapshot for validating an Omarchy update.
+if [[ -n "${GOOEY_TEST_HOST:-}" ]]; then
+  test -f "$GOOEY_TEST_HOST/shell/shell.qml"
+  args+=(--ro-bind "$GOOEY_TEST_HOST" "$mount_root/base")
+fi
+case "$mode" in
+  preview|smoke|integration)
+    command -v Hyprland >/dev/null || { echo "Missing dependency: Hyprland" >&2; exit 1; }
+    parent_socket=${WAYLAND_DISPLAY:?Run preview from your Wayland desktop.}
+    [[ "$parent_socket" == /* ]] || parent_socket="${XDG_RUNTIME_DIR:?}/$parent_socket"
+    [[ -S "$parent_socket" ]] || { echo "Parent Wayland socket is unavailable." >&2; exit 1; }
+    args+=(--ro-bind "$parent_socket" /run/host-wayland
+      --setenv WAYLAND_DISPLAY /run/host-wayland --setenv HYPRLAND_NO_SD_VARS 1)
+    # Render nodes allow drawing; keep KMS card nodes and physical input hidden.
+    for render_node in /dev/dri/renderD*; do
+      [[ -e "$render_node" ]] && args+=(--dev-bind "$render_node" "$render_node")
+    done
+    if [[ "$mode" == smoke ]]; then
+      rm -f "$project_dir/.devhome/.cache/omarchy-mouse-smoke.status"
+      bwrap "${args[@]}" dbus-run-session -- timeout 25s Hyprland --config "$mount_root/dev/hyprland-smoke.lua"
+      test "$(cat "$project_dir/.devhome/.cache/omarchy-mouse-smoke.status")" = 0
+    elif [[ "$mode" == integration ]]; then
+      rm -f "$project_dir/.devhome/.cache/gooey-integration.status"
+      bwrap "${args[@]}" dbus-run-session -- timeout 240s Hyprland --config "$mount_root/dev/hyprland.lua"
+      test "$(cat "$project_dir/.devhome/.cache/gooey-integration.status")" = 0
+    else
+      exec bwrap "${args[@]}" dbus-run-session -- Hyprland --config "$mount_root/dev/hyprland.lua"
+    fi
+    ;;
+  check-isolation)
+    exec bwrap "${args[@]}" dbus-run-session -- "$mount_root/dev/check-isolation"
+    ;;
+esac

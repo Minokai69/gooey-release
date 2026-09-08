@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "idle": {
+    "screensaver": 0,
+    "lock": 0
+  },
+  "bar": {
+    "position": "top",
+    "transparent": false,
+    "centerAnchor": "omarchy.clock",
+    "layout": {
+      "left": [
+        {
+          "id": "omarchy.menu"
+        },
+        {
+          "id": "omarchy.workspaces"
+        }
+      ],
+      "center": [
+        {
+          "id": "omarchy.clock",
+          "format": "'GOOEY \u00b7 DEV  'HH:mm"
+        }
+      ],
+      "right": []
+    }
+  },
+  "plugins": [],
+  "disabledPlugins": [
+    "omarchy.idle",
+    "omarchy.lock",
+    "omarchy.polkit",
+    "omarchy.battery",
+    "omarchy.nightlight",
+    "omarchy.notifications",
+    "omarchy.osd"
+  ]
+}

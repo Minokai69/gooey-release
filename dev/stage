@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+if [[ ! -d "$project_dir/.devhome" ]]; then
+  cp -a "$project_dir/seed" "$project_dir/.devhome"
+fi
+"$project_dir/gooey" install --home "$project_dir/.devhome"
+"$project_dir/gooey" activate --home "$project_dir/.devhome"

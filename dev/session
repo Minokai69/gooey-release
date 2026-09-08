@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+test "${OMARCHY_MOUSE_PREVIEW:-}" = 1
+test "$WAYLAND_DISPLAY" != /run/host-wayland
+mkdir -p "$XDG_CACHE_HOME"
+# Aquamarine still obtains its allocator from the existing nested Wayland
+# backend. Move testing onto a timer-driven headless output before any clients
+# start, so a locked or sleeping parent desktop cannot stall screenshot frames.
+if [[ "${GOOEY_HEADLESS:-0}" == 1 ]]; then
+  test "${GOOEY_MODE:-}" = integration
+  if ! python3 - <<'PY' > "$XDG_CACHE_HOME/gooey-headless.log" 2>&1
+import json
+import subprocess
+import time
+
+name = 'HEADLESS-GOOEY'
+
+def run(*args):
+    result = subprocess.run(['hyprctl', *args], capture_output=True, text=True, timeout=5)
+    if result.returncode:
+        raise RuntimeError(f'{args}: {result.stdout} {result.stderr}')
+    return result.stdout.strip()
+
+def monitors():
+    return json.loads(run('-j', 'monitors'))
+
+def wait(predicate, label):
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline:
+        current = monitors()
+        if predicate(current):
+            return current
+        time.sleep(.1)
+    raise RuntimeError(f'Headless setup timed out: {label}; {monitors()}')
+
+original = monitors()
+assert original and all(m['name'].startswith('WAYLAND-') for m in original), original
+assert run('output', 'create', 'headless', name) == 'ok'
+run('eval', 'hl.monitor({ output="HEADLESS-GOOEY", mode="1280x800@60", position="0x0", scale=1 })')
+wait(lambda ms: any(m['name'] == name and m['width'] == 1280 and m['height'] == 800
+                    and m['scale'] == 1 and m['x'] == 0 and m['y'] == 0 for m in ms),
+     '1280x800 headless output')
+for output in original:
+    assert run('output', 'remove', output['name']) == 'ok'
+wait(lambda ms: len(ms) == 1 and ms[0]['name'] == name, 'nested Wayland output removal')
+run('dispatch', 'hl.dsp.focus({ monitor="HEADLESS-GOOEY" })')
+run('dispatch', 'hl.dsp.focus({ workspace="1" })')
+ready = wait(lambda ms: len(ms) == 1 and ms[0]['name'] == name and ms[0]['focused']
+             and ms[0]['activeWorkspace']['id'] == 1, 'headless workspace 1 focus')
+print(json.dumps({'before': original, 'ready': ready}, indent=2), flush=True)
+PY
+  then
+    cat "$XDG_CACHE_HOME/gooey-headless.log" >&2
+    echo 1 > "$XDG_CACHE_HOME/gooey-integration.status"
+    hyprctl dispatch 'hl.dsp.exit()' >/dev/null 2>&1 || true
+    exit 1
+  fi
+fi
+# The nested compositor deliberately uses its own process supervisor. Dismiss
+# its initial direct-launch notice before the companion/UI can emit notices.
+hyprctl dismissnotify >/dev/null 2>&1 || true
+release="$HOME/.local/share/gooey/current"
+if [[ -f "$HOME/.local/share/gooey/activation.json" && -f "$release/companion/gooey.so" ]]; then
+  if ! hyprctl plugin load "$release/companion/gooey.so" > "$XDG_CACHE_HOME/gooey-companion.log" 2>&1; then
+    echo 'Gooey companion unavailable; continuing with the normal shell.' >&2
+  fi
+fi
+quickshell -n -p "$OMARCHY_PATH/shell" > "$XDG_CACHE_HOME/gooey-shell.log" 2>&1 &
+shell_pid=$!
+fixture_pid=""
+trap 'kill "$shell_pid" ${fixture_pid:-} 2>/dev/null || true' EXIT
+quickshell -n -p "$GOOEY_ROOT/dev/fixtures" > "$XDG_CACHE_HOME/gooey-fixtures.log" 2>&1 &
+fixture_pid=$!
+if [[ "${GOOEY_MODE:-}" == integration ]]; then
+  result=0
+  script=integration.py
+  [[ "${GOOEY_CAPTURE_RELEASE:-0}" == 1 ]] && script=release-capture.py
+  python3 "$GOOEY_ROOT/dev/$script" > "$XDG_CACHE_HOME/gooey-integration.log" 2>&1 || result=$?
+  echo "$result" > "$XDG_CACHE_HOME/gooey-integration.status"
+  hyprctl dispatch 'hl.dsp.exit()' >/dev/null 2>&1 || true
+  exit "$result"
+fi
+wait "$shell_pid"

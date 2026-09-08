@@ -1,0 +1,5 @@
+hl.monitor({ output = "", mode = "1280x800@60", position = "auto", scale = 1 })
+hl.config({ ecosystem = { no_update_news = true }, misc = { disable_hyprland_logo = true, disable_splash_rendering = true } })
+hl.on("hyprland.start", function()
+  hl.exec_cmd("/opt/omarchy-mouse-shell/dev/smoke-session")
+end)

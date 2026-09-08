@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "gooey.window-tools",
+  "name": "Gooey window tools",
+  "version": "0.1.0-dev",
+  "author": "Gooey",
+  "description": "Window actions, workspace destinations, and a visible Shelf",
+  "kinds": ["service", "panel", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "WindowService.qml",
+    "panel": "WindowMenu.qml",
+    "barWidget": "ShelfWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Shelf",
+    "description": "Find and take back windows on the Shelf",
+    "category": "Compositor",
+    "allowMultiple": false,
+    "defaultSection": "left"
+  }
+}

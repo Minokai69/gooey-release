@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+log_file="$XDG_CACHE_HOME/omarchy-mouse-smoke.log"
+quickshell -n -p "$OMARCHY_PATH/shell" > "$log_file" 2>&1 &
+shell_pid=$!
+trap 'kill "$shell_pid" 2>/dev/null || true; wait "$shell_pid" 2>/dev/null || true' EXIT
+for attempt in {1..50}; do
+  kill -0 "$shell_pid" 2>/dev/null || { cat "$log_file"; exit 1; }
+  if qs ipc -p "$OMARCHY_PATH/shell" call shell ping 2>/dev/null | grep -qx ok; then
+    sleep 2
+    kill -0 "$shell_pid"
+    if grep -E 'Failed to load configuration|Type .* unavailable|SyntaxError' "$log_file"; then exit 1; fi
+    hyprctl configerrors > "$XDG_CACHE_HOME/omarchy-mouse-configerrors.txt"
+    if grep -q '[^[:space:]]' "$XDG_CACHE_HOME/omarchy-mouse-configerrors.txt"; then
+      cat "$XDG_CACHE_HOME/omarchy-mouse-configerrors.txt"
+      exit 1
+    fi
+    grim "$XDG_CACHE_HOME/omarchy-mouse-preview.png"
+    echo 'PASS: isolated shell loaded and answered IPC ping (nested Wayland).'
+    exit 0
+  fi
+  sleep 0.2
+done
+cat "$log_file"
+echo 'FAIL: shell did not answer IPC ping.' >&2
+exit 1
