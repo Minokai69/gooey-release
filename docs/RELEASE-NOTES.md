@@ -5,7 +5,13 @@ keybindings for daily navigation. Visible window controls and an anchored app me
 make the mouse useful alongside the shortcuts you already like.
 
 This is a **source-install preview candidate**, not a general compatibility release.
-This public snapshot is released as v0.1.0-preview.1, with marketplace review requested.
+This public snapshot is released as v0.1.0-preview.2, with marketplace review requested.
+
+## Preview 2 correction
+
+Removed the development-only coding-agent instruction file from the distributed
+source and its documentation link. The public tree was checked for equivalent
+agent-control files. No application or native companion behavior changed.
 
 ## Included
 

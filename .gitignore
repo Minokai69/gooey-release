@@ -2,3 +2,16 @@
 work/
 __pycache__/
 companions/hyprland/build/
+
+# Keep local coding-agent instructions out of the distributed source.
+AGENTS.md
+AGENTS.override.md
+CLAUDE.md
+GEMINI.md
+.cursorrules
+.cursor/
+.claude/
+.codex/
+.agents/
+.github/copilot-instructions.md
+.github/instructions/

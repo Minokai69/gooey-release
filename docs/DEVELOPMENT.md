@@ -6,7 +6,7 @@ The preview defaults to mounting `/usr/share/omarchy` read-only.
 Gooey has two Quickshell plugins (`gooey.launcher`, `gooey.window-tools`) and a
 native Hyprland decoration companion. `base/` and `UPSTREAM.json` preserve the
 original Omarchy reference; `HOST.json` describes the currently reviewed host.
-Read [AGENTS.md](../AGENTS.md) and [PRODUCT.md](../PRODUCT.md) before changing it.
+See [PRODUCT.md](../PRODUCT.md) for the architecture and compatibility boundaries.
 
 ## Build and test
 
