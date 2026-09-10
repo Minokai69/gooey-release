@@ -10,6 +10,11 @@ available; preview 3 has not been tagged as a release. Marketplace review is pen
 
 ## Preview 3 source update
 
+- Added a source installer with read-only readiness checks, validation-only mode,
+  build/test-before-deploy ordering, explicit activation, and previous-build
+  recovery for failed updates. Supports the existing pinned host only.
+- Added fresh-profile deployment/removal checks and installer failure-path tests.
+
 - Added 25% column sizing to the native frame and window menus, alongside 50%,
   85%, and 100%, with a matching icon, tooltip, and selected state.
 - Skip empty drag targets in narrow frames.

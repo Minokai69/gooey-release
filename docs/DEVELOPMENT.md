@@ -10,6 +10,10 @@ See [PRODUCT.md](../PRODUCT.md) for the architecture and compatibility boundarie
 
 ## Build and test
 
+`./install --validate` runs the complete supported-host build and validation flow
+without deploying to the main session. `./install --check` only reads readiness
+information. The individual commands below remain useful during development.
+
 Use a C++23 compiler, Python 3, Node.js, pkg-config, the matching Hyprland development
 headers, and the development libraries requested by `companions/hyprland/build.sh`
 (including Cairo and PangoCairo). The private desktop uses Bubblewrap, D-Bus,

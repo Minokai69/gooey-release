@@ -37,8 +37,8 @@ Attached controls, Quickshell menus, local release staging/selection/restore, an
 personal main-session integration are implemented. Daily use currently targets
 the pinned Omarchy 4.0.2-1, Quickshell 0.3.1, and Hyprland 0.56.2 host recorded in
 the validation documentation. Source deployment and an explicit enable command
-are available, with a graphical **Restore stock Omarchy** entry. A public installer,
-online releases, graphical activation, and automatic update integration remain
+are available, with a graphical **Restore stock Omarchy** entry. A source installer now builds and validates the pinned host before optional
+activation. Broader host support and automatic update integration remain
 future work; see [docs/INSTALL.md](docs/INSTALL.md) for the current boundary.
 
 ## Distribution boundary

@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+"""Build and install Gooey on a supported Omarchy desktop."""
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parent
+HOST = Path('/usr/share/omarchy')
+HEADER = Path('/usr/include/hyprland/src/version.h')
+TOOLS = ('c++', 'pkg-config', 'python3', 'node', 'bwrap', 'dbus-run-session',
+         'quickshell', 'qs', 'Hyprland', 'hyprctl', 'grim', 'wayland-scanner', 'cc', 'pacman', 'omarchy')
+LIBRARIES = ('pixman-1', 'libdrm', 'hyprland', 'libinput', 'libudev',
+             'wayland-server', 'wayland-client', 'xkbcommon', 'cairo', 'pangocairo')
+
+
+def output(*args):
+    return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT, timeout=15).strip()
+
+
+def check(home):
+    """Read-only readiness checks; report all actionable failures together."""
+    errors = []
+    if os.geteuid() == 0:
+        errors.append('Run as your normal desktop user, without sudo.')
+    missing = [tool for tool in TOOLS if not shutil.which(tool)]
+    if missing:
+        errors.append('Missing commands: ' + ', '.join(missing) + '. See docs/INSTALL.md for dependencies.')
+    expected = json.loads((ROOT / 'HOST.json').read_text())
+    pin = json.loads((ROOT / 'companions/hyprland/PIN.json').read_text())
+    def expect(args, value, label):
+        if args[0] in missing:
+            return
+        try:
+            actual = output(*args)
+            if actual != value:
+                errors.append(f'{label}: supported {value!r}; found {actual!r}. Use a supported Gooey revision; do not downgrade the desktop automatically.')
+        except (OSError, subprocess.SubprocessError) as exc:
+            errors.append(f'Cannot check {label}: {exc}')
+    expect(('pacman', '-Q', 'omarchy'), expected['package'], 'Omarchy')
+    expect(('quickshell', '--version'), expected['quickshell'], 'Quickshell')
+    expect(('pkg-config', '--modversion', 'hyprland'), pin['hyprlandVersion'], 'Hyprland headers')
+    if 'pkg-config' not in missing:
+        for lib in LIBRARIES:
+            try:
+                output('pkg-config', '--exists', lib)
+            except (OSError, subprocess.SubprocessError):
+                errors.append(f'Missing development library: {lib} (pkg-config).')
+    header = HEADER
+    match = re.search(r'#define GIT_COMMIT_HASH\s+"(.*?)"', header.read_text()) if header.is_file() else None
+    if not match or match.group(1) != pin['hyprlandCommit']:
+        errors.append('Hyprland development headers do not match the supported compositor commit.')
+    changed = [name for name, sha in expected['files'].items() if name.startswith('shell/')
+               and (not (HOST / name).is_file() or hashlib.sha256((HOST / name).read_bytes()).hexdigest() != sha)]
+    if changed:
+        errors.append(f'Omarchy shell differs from the tested host ({len(changed)} files; first: {changed[0]}).')
+    if not os.environ.get('HYPRLAND_INSTANCE_SIGNATURE') or not os.environ.get('WAYLAND_DISPLAY'):
+        errors.append('Run from a terminal inside your Omarchy Hyprland desktop.')
+    elif 'hyprctl' not in missing:
+        try:
+            version = json.loads(output('hyprctl', '-j', 'version'))
+            if version.get('commit') != pin['hyprlandCommit'] or version.get('version') != pin['hyprlandVersion']:
+                errors.append('The running Hyprland does not match the supported version/commit. Log out and back in if it was just updated.')
+            config_errors = output('hyprctl', 'configerrors')
+            if config_errors:
+                errors.append('Fix existing Hyprland configuration errors: ' + config_errors)
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            errors.append(f'Cannot inspect the running desktop: {exc}')
+    for name in ('.config/omarchy/shell.json', '.config/hypr/hyprland.lua'):
+        path = home / name
+        if not path.is_file() or path.is_symlink():
+            errors.append(f'Expected a regular existing {name}; finish Omarchy setup first.')
+    if errors:
+        raise RuntimeError('\n- ' + '\n- '.join(errors))
+    print('Compatibility and dependencies passed. Desktop files have not been changed.', flush=True)
+
+
+def run(*args):
+    env = dict(os.environ, GOOEY_TEST_HOST=str(HOST))
+    subprocess.run([str(a) for a in args], cwd=ROOT, env=env, check=True)
+
+
+def validate():
+    # Build and test before touching the installed desktop or disabling its old build.
+    for command in (
+        ('./companions/hyprland/build.sh',), ('./dev/build-input',),
+        ('python3', '-m', 'unittest', 'discover', '-s', 'tests', '-q'),
+        ('node', 'experience/plugins/gooey.launcher/tests/anchor-resolver.test.cjs'),
+        ('python3', 'dev/test-clean-profile.py'),
+        ('./dev/stage',), ('./dev/run', 'check-isolation'),
+        ('./dev/run', 'smoke'), ('./dev/run', 'integration-headless'),
+    ):
+        print('Running ' + ' '.join(command), flush=True)
+        run(*command)
+
+
+def install(home, enable=False):
+    check(home)
+    data = home / '.local/share/gooey'
+    active = (data / 'activation.json').exists()
+    if active and not enable:
+        raise RuntimeError('Gooey is already enabled. Use ./install --enable to build, test, and switch to this update.')
+    validate()
+    command = home / '.local/bin/gooey'
+    previous = (data / 'current').resolve().name if active else None
+    if active:
+        run(command, 'disable')
+    try:
+        run('./session/gooey-session', 'deploy')
+        if enable:
+            run(command, 'enable', '--check')
+            run(command, 'enable')
+    except (OSError, subprocess.SubprocessError, KeyboardInterrupt):
+        if active:
+            # enable itself rolls back partial activation. Re-select the prior
+            # verified payload; never rebuild or overwrite its native binary.
+            try:
+                run(command, 'disable')
+                staged = data / 'staged.json'
+                temporary = staged.with_name('staged.json.install-recovery')
+                temporary.write_text(json.dumps({'version': previous}) + '\n')
+                temporary.replace(staged)
+                run(command, 'enable')
+                print('Update failed; the previous Gooey build has been restored.', file=sys.stderr)
+            except (OSError, subprocess.SubprocessError) as recovery:
+                print(f'Previous-build recovery failed: {recovery}. Run ~/.local/bin/gooey disable to restore stock Omarchy.', file=sys.stderr)
+        raise
+    print('Gooey is enabled.' if enable else 'Gooey is installed. Enable it with ~/.local/bin/gooey enable or Omarchy → Style → Gooey.')
+    print('To restore your desktop settings: ~/.local/bin/gooey disable')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--check', action='store_true', help='check compatibility and dependencies without writing files')
+    group.add_argument('--validate', action='store_true', help='build and run all isolated checks without installing on this desktop')
+    group.add_argument('--enable', action='store_true', help='activate after tests; update an existing installation with recovery on failure')
+    args = parser.parse_args()
+    home = Path.home().resolve()
+    if args.check:
+        check(home)
+        return
+    # One source-tree operation at a time, including private test staging.
+    check(home)
+    work = ROOT / 'work'
+    work.mkdir(exist_ok=True)
+    with (work / 'install.lock').open('w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.validate:
+            validate()
+            print("Validation passed. No main-session installation was performed.")
+        else:
+            install(home, args.enable)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print('Gooey installation interrupted.', file=sys.stderr)
+        sys.exit(130)
+    except (RuntimeError, OSError, ValueError, subprocess.SubprocessError) as exc:
+        print(f'Gooey installation stopped: {exc}', file=sys.stderr)
+        sys.exit(1)

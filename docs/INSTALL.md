@@ -5,10 +5,79 @@ Quickshell **0.3.1**, and Hyprland **0.56.2** at
 `efb50993780079460b0cbed1363e2166a2de1d9f`. It uses the installed Omarchy shell,
 user plugin registrations, and a separate native companion. The public source omits `base/`; nested tests mount installed Omarchy read-only.
 
-This is deployment from reviewed source for the tested host. A public installer,
-release/update channel, and compatibility with other versions remain future work.
+This is deployment from reviewed source for the tested host. The source installer
+below supports this pinned host. An automatic release/update channel and compatibility with other versions remain future work.
 These instructions describe activation; deployment alone does not enable the
 main-session experience.
+
+## Recommended source installer
+
+From a terminal in the target PC's unlocked Omarchy session, run:
+
+```sh
+git clone https://github.com/Minokai69/gooey-release.git
+cd gooey-release
+./install --check
+./install --enable
+```
+
+Use a source revision whose supported host matches your PC. `--check` is read-only:
+it reports missing commands/libraries, package or compositor mismatches, changed
+shell files, and existing configuration errors before any build or deployment.
+Do not run the installer with sudo. It does not install packages or downgrade your
+system. Install missing dependencies through Omarchy's package manager, then retry.
+
+The build uses GCC with C++23 support, pkgconf, the matching Hyprland headers,
+Cairo, Pango, pixman, libdrm, libinput, systemd's libudev, Wayland, and libxkbcommon.
+Checks also need Python 3, Node.js, Bubblewrap, D-Bus, Quickshell, grim, and the
+Wayland scanner. The installed Hyprland package must supply the pinned headers;
+installing an arbitrary newer header package is not a supported workaround.
+
+`./install --enable` builds the native companion on this PC, runs the unit and
+fresh-profile tests, then the isolated smoke and desktop checks. This takes several
+minutes and briefly opens a nested test desktop during the smoke check. Close any
+existing Gooey preview before starting. A failure stops the installation.
+
+`./install --validate` runs the build and all tests without deploying to the main
+desktop. It is useful for checking a candidate source revision first.
+
+For a first install, `./install` performs the same checks and stages Gooey without
+enabling it. You can then choose **Omarchy → Style → Gooey** or run
+`~/.local/bin/gooey enable`. `--enable` explicitly requests activation.
+
+For an update, obtain the reviewed source revision and run `./install --enable`
+again. Your current Gooey build stays active throughout compilation and testing.
+After successful checks, the installer disables the old build, deploys the new
+one, and enables it. If deployment or activation fails, it attempts to re-enable
+the previous verified payload and reports whether that recovery succeeded.
+The immediate recovery command is always `~/.local/bin/gooey disable`.
+
+To remove the active integration, run `~/.local/bin/gooey disable`. To additionally
+remove unused payload files after disabling, run `./gooey uninstall --home "$HOME"`
+from the source checkout. User edits, backups, and the session recovery runtime
+are retained. There is no automatic deletion of all Gooey-related user data.
+
+### What is supported on another PC?
+
+The same pinned software stack is required on each PC. The installer builds
+locally; do not copy this PC's `.so` into a different Hyprland build. Niri and other
+Omarchy/Hyprland versions are not supported yet. A fresh-profile test verifies
+file installation, repeat installation, restoration, and payload removal; it is
+not a clean OS install or a hardware compatibility certification. A second-PC
+install and fresh login still need acceptance testing before wider claims.
+
+Before calling another PC supported, verify on that machine:
+
+1. Run `./install --check`, then `./install --enable`; retain the validation result.
+2. Log out and back in. Confirm the bar, window controls, and Style toggle load.
+3. Test move/resize, Shelf, fullscreen exit, and 25%/50%/85%/100% scrolling sizes
+   with real applications and each connected display/scale.
+4. Disable Gooey and confirm normal Omarchy navigation and personal settings are
+   restored. Re-enable it, then test a source update and its recovery path.
+
+Record the OS/package versions, GPU, display scales, results, and any failures.
+A different host version needs a reviewed compatibility update before these steps;
+do not edit `HOST.json` merely to make the check pass.
 
 ## Build and validate before deployment
 

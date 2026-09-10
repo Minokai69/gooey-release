@@ -37,18 +37,14 @@ isolated screenshot environment; it is not branding added to your installed bar.
 
 **Manual setup required.** The root manifest exposes Gooey’s window-tools plugin,
 but installing that manifest alone does not build or enable the native companion
-or register the bundled launcher. Use the full source workflow below.
+or register the bundled launcher. Use the source installer below from a terminal
+on the PC where you want Gooey. It builds and tests before changing the desktop.
 
 ```sh
 git clone https://github.com/Minokai69/gooey-release.git
 cd gooey-release
-./companions/hyprland/build.sh
-./dev/stage
-./dev/build-input
-GOOEY_TEST_HOST=/usr/share/omarchy ./dev/run integration-headless
-./session/gooey-session deploy
-~/.local/bin/gooey enable --check
-~/.local/bin/gooey enable
+./install --check
+./install --enable
 ```
 
 Read the [dependencies and recovery instructions](docs/INSTALL.md) first. The build
@@ -79,8 +75,8 @@ This preview targets the tested **Omarchy 4.0.3-1**, **Quickshell 0.3.1**, and
 metadata. Matching version numbers alone are not enough: Gooey checks the shell
 files and native API compatibility too.
 
-Installation is currently from reviewed source, and updates are manual. There is
-no public one-command installer or automatic update channel yet. Niri is a future
+Installation is from reviewed source. The source installer supports this pinned
+host and handles explicit updates; there is no automatic update channel yet. Niri is a future
 goal and is **not supported in this preview**.
 
 The right frame button enters true fullscreen, just like **Super+F**. Hyprland
