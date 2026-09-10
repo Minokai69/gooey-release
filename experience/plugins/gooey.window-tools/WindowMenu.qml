@@ -68,6 +68,18 @@ Item {
             ActionButton {
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
+                text: "25%"
+                Accessible.name: "25% " + root.columnDimension
+                actionKey: "column-width-quarter"
+                windowId: root.targetId
+                selected: Math.abs(root.columnFraction - 0.25) < 0.005
+                hint: "Set this column to 25% of the available workspace " + root.columnDimension
+                enabled: root.can("column-width")
+                onClicked: root.act("column-width", "quarter")
+            }
+            ActionButton {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
                 text: "Half"
                 Accessible.name: "Half " + root.columnDimension
                 actionKey: "column-width-half"

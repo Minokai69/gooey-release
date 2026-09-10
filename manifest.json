@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "gooey.window-tools",
   "name": "Gooey",
-  "version": "0.1.0-preview.2",
+  "version": "0.1.0-preview.3",
   "author": "Minokai69 and Gooey contributors",
   "description": "Mouse-friendly window navigation for Hyprland with Omarchy; use visible controls alongside your keybindings. Requires manual native-companion setup.",
   "kinds": [

@@ -5,7 +5,18 @@ keybindings for daily navigation. Visible window controls and an anchored app me
 make the mouse useful alongside the shortcuts you already like.
 
 This is a **source-install preview candidate**, not a general compatibility release.
-This public snapshot is released as v0.1.0-preview.2, with marketplace review requested.
+The current source identifies as 0.1.0-preview.3. The published preview 2 tag remains
+available; preview 3 has not been tagged as a release. Marketplace review is pending.
+
+## Preview 3 source update
+
+- Added 25% column sizing to the native frame and window menus, alongside 50%,
+  85%, and 100%, with a matching icon, tooltip, and selected state.
+- Skip empty drag targets in narrow frames.
+- Verified the native build, 174 isolated desktop checks, 40 packaging/session
+  tests, six launcher-anchor checks, isolation, and smoke checks.
+- Installed and verified on the existing tested desktop. Clean-machine
+  installation on another PC remains unverified.
 
 ## Preview 2 correction
 
@@ -19,7 +30,7 @@ agent-control files. No application or native companion behavior changed.
 - Full app labels, a central click-or-drag resize grip, and hover explanations.
 - Per-window Shelf, workspace, actions, true fullscreen, and close controls.
 - Dwindle controls that hide ineffective resize axes.
-- Scrolling 50%, 85%, and 100% column sizes and Previous/Center/Next navigation.
+- Scrolling 25%, 50%, 85%, and 100% column sizes and Previous/Center/Next navigation.
 - Quickshell Apps & desktop menu anchored to the Omarchy logo.
 - A persistent **Style → Gooey** toggle, configuration backups, and stock recovery.
 

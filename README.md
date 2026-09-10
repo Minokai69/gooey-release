@@ -22,7 +22,7 @@ isolated screenshot environment; it is not branding added to your installed bar.
   attached to its native frame.
 - **Move and resize:** drag the app-name area to move; drag the grip beside it to
   resize, or click that grip for size controls.
-- **Use your layout:** dwindle gets split-aware resizing; scrolling gets **50%,
+- **Use your layout:** dwindle gets split-aware resizing; scrolling gets **25%, 50%,
   85%, and 100%** column sizes plus column navigation.
 - **Learn as you go:** hover over icons for short explanations. Labels stay visible
   beside the central resize grip.

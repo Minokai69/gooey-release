@@ -90,7 +90,7 @@ std::array<TabControl, 12> tabControls(const CBox& box, PHLWINDOW owner) {
             if (axes.horizontal) left.insert(left.end(), {"tile-narrower", "tile-wider"});
             if (axes.vertical) left.insert(left.end(), {"tile-shorter", "tile-taller"});
         }
-        if (layout == "scrolling") left.insert(left.end(), {"column-half", "column-85", "column-full"});
+        if (layout == "scrolling") left.insert(left.end(), {"column-quarter", "column-half", "column-85", "column-full"});
     }
     const double start = left.size() * box.h;
     const double end = box.w - (compact ? 1 : 5) * box.h;
@@ -176,7 +176,7 @@ static SP<Render::ITexture> makeActionIcon(const std::string& action, bool float
     } else if (action.starts_with("column-")) {
         frame(3, 5, 18, 14);
         cairo_stroke(cr.get());
-        const double fraction = action == "column-half" ? .5 : action == "column-85" ? .85 : 1.;
+        const double fraction = action == "column-quarter" ? .25 : action == "column-half" ? .5 : action == "column-85" ? .85 : 1.;
         cairo_rectangle(cr.get(), 6, 8, 12 * fraction, 8);
         cairo_fill(cr.get());
     } else if (action == "fullscreen") {
@@ -428,6 +428,7 @@ std::string CHyprBar::buttonAt(Vector2D coords) {
     if (box.w <= 0 || box.h <= 0) return "";
     for (const auto& control : tabControls(box, m_pWindow.lock())) {
         if (!control.action) break;
+        if (control.width <= 0) continue;
         const CBox target{control.x, 0, control.width, box.h};
         if (target.containsPoint(coords)) return control.action;
     }
@@ -444,6 +445,7 @@ std::string CHyprBar::buttonState() {
     std::string out = "[";
     for (const auto& control : tabControls(box, m_pWindow.lock())) {
         if (!control.action) break;
+        if (control.width <= 0) continue;
         if (out.size() > 1) out += ",";
         out += std::format("{{\"action\":\"{}\",\"x\":{},\"y\":{},\"width\":{},\"height\":{}}}", control.action,
             box.x + control.x, box.y, control.width, box.h);
@@ -517,6 +519,7 @@ void CHyprBar::renderBarButtons(CBox* tabBox, const float scale, const float a) 
     const auto radius = static_cast<int>(std::round(std::clamp(theme.radius, 0., logical.h / 2) * scale));
     for (const auto& control : tabControls(logical, m_pWindow.lock())) {
         if (!control.action) break;
+        if (control.width <= 0) continue;
         const bool hovered = m_hoveredAction == control.action;
         const bool pressed = m_bCancelledDown && !m_buttonCancelled && m_pressedAction == control.action && hovered;
         if (!hovered && !pressed) continue;
@@ -537,6 +540,7 @@ void CHyprBar::renderBarButtonIcons(CBox* tabBox, const float scale, const float
     const auto foreground = m_bForcedTitleColor.value_or(theme.ready ? theme.foreground : configColor(g_pGlobalState->config.textColor->value()));
     for (const auto& control : tabControls(logical, m_pWindow.lock())) {
         if (!control.action) break;
+        if (control.width <= 0) continue;
         const bool drag = std::string_view(control.action) == "drag-grip";
         if (drag) continue;
         const bool hovered = m_hoveredAction == control.action;

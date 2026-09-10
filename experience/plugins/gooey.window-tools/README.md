@@ -56,7 +56,7 @@ workspaces may have negative internal IDs and are addressed by name.
 Each window also reports `layout` (`dwindle`, `scrolling`, or `other`). Scrolling
 tiles include column membership, normalized size, direction, and capability flags
 `columnWidth`, `columnCenter`, `columnPrevious`, and `columnNext`. The owned UI
-submits `column-width half|85|full`, `column-center`, or
+submits `column-width quarter|half|85|full`, `column-center`, or
 `column-focus previous|next` through the same instance-guarded window route.
 The direction-specific capability is checked before requesting column focus.
 
@@ -104,7 +104,7 @@ entry point for explicitly addressing a window in the current session.
   A fixed Back button returns to the main card. Native capability
   flags gate actions. Grouped movement is blocked; unknown capabilities default
   off.
-- Only scrolling tiles offer Half, 85%, and Full column sizes, with the current
+- Only scrolling tiles offer 25%, Half, 85%, and Full column sizes, with the current
   fraction selected. The same size controls appear in the main card and directly
   in Column controls. Vertical scrolling layouts use height labels.
   These are manual changes to the owner's entire native column, including any

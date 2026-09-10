@@ -75,11 +75,11 @@ hover hints and the Shelf count remain.
 | Layout/state | Additional controls |
 | --- | --- |
 | Dwindle tile | Change split; swap left/right/up/down; tile resize increments |
-| Scrolling tile | Half/85%/Full column size; Previous/Center/Next column; native resize |
+| Scrolling tile | 25%/Half/85%/Full column size; Previous/Center/Next column; native resize |
 | Floating window | Shared actions and native size controls |
 | Other layouts | Shared supported actions; dwindle/scrolling controls are hidden |
 
-Scrolling Half/85%/Full controls are manual. They change the owner's **column**, which
+Scrolling 25%/Half/85%/Full controls are manual. They change the owner's **column**, which
 can contain several stacked windows. Full size keeps the column in the scrolling
 tape; it does not enter maximize/fullscreen. Horizontal layouts show width labels;
 vertical layouts show height labels. Neighbor navigation explicitly brings the
@@ -130,7 +130,7 @@ splits. Ancestor splits count, so a nested tile can expose both pairs. A lone
 tile exposes neither pair. The resize menu follows the same capabilities;
 floating windows retain both axes, and single-app scrolling columns hide
 secondary-axis resizing.
-Scrolling tiles instead expose three filled-column icons for Half, 85%, and Full.
+Scrolling tiles instead expose four filled-column icons for 25%, Half, 85%, and Full.
 The current owner and layout are checked again on activation. No app rules or
 global layout preferences change. A lone dwindle tile may have no neighboring
 space to exchange.

@@ -298,7 +298,8 @@ def run_checks(test):
                    'dwindle test fixture layout')
         _open_owner(test, owner_id)
         test.check('Dwindle main controls omit scrolling-only width presets',
-                   'column-width-half' not in _visible_actions(test)
+                   'column-width-quarter' not in _visible_actions(test)
+                   and 'column-width-half' not in _visible_actions(test)
                    and 'column-width-85' not in _visible_actions(test)
                    and 'column-width-full' not in _visible_actions(test))
         _click_ui(test, 'layout-menu')
@@ -336,11 +337,11 @@ def run_checks(test):
                    and test.window(owner_id)['scrolling']['columnIndex']
                    != test.window(other_id)['scrolling']['columnIndex'])
         time.sleep(.8)
-        for preset, fraction in (('full', 1), ('85', .85), ('half', .5)):
+        for preset, fraction in (('full', 1), ('85', .85), ('half', .5), ('quarter', .25)):
             owner = test.window(owner_id)
             buttons = owner['buttons']
             test.check('Scrolling frame exposes column sizing without dwindle arrows (' + preset + ')',
-                {'column-half','column-85','column-full'}.issubset({b['action'] for b in buttons})
+                {'column-quarter','column-half','column-85','column-full'}.issubset({b['action'] for b in buttons})
                 and not any(b['action'].startswith('tile-') for b in buttons))
             peer_width = _width(test, other_id)
             assert test.action('focus', other_id)['ok']
@@ -348,11 +349,14 @@ def run_checks(test):
             test.until(lambda: abs(_width(test, owner_id) - fraction) < .001, 'direct column ' + preset)
             time.sleep(.7)
             test.check('Left frame sets column ' + preset + ' without changing its neighbor', abs(_width(test, other_id)-peer_width) < .001)
+        assert test.action('column-width', owner_id, 'half')['ok']
+        test.until(lambda: abs(_width(test, owner_id) - .5) < .001, 'restore half after frame presets')
         _open_owner(test, owner_id)
-        test.until(lambda: 'column-width-half'  in _visible_actions(test)
+        test.until(lambda: 'column-width-quarter' in _visible_actions(test)
+                   and 'column-width-half'  in _visible_actions(test)
                    and 'column-width-85' in _visible_actions(test)
                    and 'column-width-full' in _visible_actions(test), 'scrolling manual width controls')
-        test.check('Scrolling exposes manual Half width, 85%, and Full width controls')
+        test.check('Scrolling exposes manual 25%, Half width, 85%, and Full width controls')
         initial_width = test.window(owner_id)['width']
         other_width = _width(test, other_id)
         assert test.action('focus', other_id)['ok']
@@ -381,6 +385,18 @@ def run_checks(test):
                    and test.window(owner_id)['fullscreen'] == 0)
         _pointer_to_menu_header(test)
         test.shot('gooey-scrolling-85')
+        assert test.action('focus', other_id)['ok']
+        _click_ui(test, 'column-width-quarter')
+        test.until(lambda: abs(_width(test, owner_id) - .25) < .001
+                   and not _menu(test)['busy'], 'quarter-width column action')
+        test.until(lambda: test.window(owner_id)['width'] < initial_width * .65,
+                   'quarter-width native client geometry')
+        test.check('25% resizes the captured column without changing its neighbor',
+                   _menu(test)['targetId'] == owner_id
+                   and abs(_width(test, other_id) - other_width) < .001
+                   and not test.window(owner_id)['floating']
+                   and not test.window(owner_id)['maximized'])
+        _check_visible_strip_bounds(test, 'quarter')
         _click_ui(test, 'column-width-half')
         test.until(lambda: abs(_width(test, owner_id) - .5) < .001
                    and not _menu(test)['busy'], 'half-width column action')
@@ -433,7 +449,8 @@ def run_checks(test):
         _configure(test, 'dwindle', original_scrolling)
         test.until(lambda: all(test.window(w['id'])['layout'] == 'dwindle'
                                for w in originals), 'return to dwindle')
-        test.until(lambda: 'column-width-half' not in _visible_actions(test)
+        test.until(lambda: 'column-width-quarter' not in _visible_actions(test)
+                   and 'column-width-half' not in _visible_actions(test)
                    and 'column-width-85' not in _visible_actions(test)
                    and 'column-width-full' not in _visible_actions(test),
                    'open menu adapts back to dwindle')

@@ -69,6 +69,7 @@ step; use the resize grip for finer adjustments.
 
 | Actual icon | Result |
 | --- | --- |
+| 25% | Set the column to **25%** of the available workspace width. |
 | ![Half](media/release/icon-column-half.png) Half | Set the column to **50%** of the available workspace width. |
 | ![85 percent](media/release/icon-column-85.png) 85% | Set it to **85%**, leaving a little neighboring content in view. |
 | ![Full column](media/release/icon-column-full.png) Full | Set it to **100%** of the available workspace width. This is a column size, not fullscreen. |
@@ -79,7 +80,7 @@ They are manual choices: Gooey installs no automatic per-app width rules.
 
 ![Scrolling column controls](media/release/scrolling-controls.png)
 
-- **Half / 85% / Full:** set an explicit column size; the selected size is highlighted.
+- **25% / Half / 85% / Full:** set an explicit column size; the selected size is highlighted.
 - **Previous / Next:** focus the neighboring column in the indicated direction.
 - **Center:** center this column in the scrolling viewport.
 - **Narrower / Widen:** adjust size incrementally rather than choosing a preset.

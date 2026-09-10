@@ -23,7 +23,7 @@ overlaps neither the application nor Omarchy’s bar, without rearranging window
 on hover. Match the bar’s thickness, font, and existing theme tokens. Clicking the
 diagonal resize icon opens layout and sizing options; dragging it uses native
 resizing. Explain that tiled resizing shares space with neighboring tiles.
-Show split/swap for dwindle and manual Half/85%/Full column sizes and navigation for
+Show split/swap for dwindle and manual 25%/Half/85%/Full column sizes and navigation for
 scrolling. Do not install app-specific sizing rules or switch the user's layout.
 Window popups follow their specific opener button. Launcher and Shelf bar buttons
 show icons without permanent text labels. The launcher must open from the Omarchy menu-bar button or right Super and remain

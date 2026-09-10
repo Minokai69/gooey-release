@@ -140,8 +140,8 @@ Item {
                 return false;
             command += " " + String(arg);
         } else if (action === "column-width") {
-            if (["half", "85", "full"].indexOf(String(arg)) === -1)
-                return failAction(action, key, "Choose half, 85%, or full column width.");
+            if (["quarter", "half", "85", "full"].indexOf(String(arg)) === -1)
+                return failAction(action, key, "Choose 25%, half, 85%, or full column width.");
             command += " " + String(arg);
         } else if (action === "column-focus") {
             if (["previous", "next"].indexOf(String(arg)) === -1)

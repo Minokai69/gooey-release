@@ -149,8 +149,8 @@ std::string action(PHLWINDOW w, const std::string& name, const std::string& args
         if (!supportsSplit(w)) return result(false, "Tile sizing requires a dwindle tile");
         return action(w, "resize", name == "tile-narrower" ? "-200 0" : name == "tile-wider" ? "200 0" : name == "tile-shorter" ? "0 -200" : "0 200");
     }
-    if (name == "column-half" || name == "column-85" || name == "column-full")
-        return action(w, "column-width", name == "column-half" ? "half" : name == "column-85" ? "85" : "full");
+    if (name == "column-quarter" || name == "column-half" || name == "column-85" || name == "column-full")
+        return action(w, "column-width", name == "column-quarter" ? "quarter" : name == "column-half" ? "half" : name == "column-85" ? "85" : "full");
     if (name == "close") return result(CA::closeWindow(w));
     if (name == "focus") return result(CA::focus(w));
     if (name == "menu-workspace" || name == "menu-actions" || name == "menu-layout") {
@@ -224,9 +224,9 @@ std::string action(PHLWINDOW w, const std::string& name, const std::string& args
         if (!scrolling || !columnCanChange(w, scrolling))
             return result(false, "Column controls require an unmaximized scrolling tile");
         if (name == "column-width") {
-            const float width = args == "half" ? 0.5F : args == "85" ? 0.85F : args == "full" ? 1.F :
+            const float width = args == "quarter" ? 0.25F : args == "half" ? 0.5F : args == "85" ? 0.85F : args == "full" ? 1.F :
                 args == "third" ? 1.F / 3.F : args == "two-thirds" ? 2.F / 3.F : 0.F;
-            if (width == 0) return result(false, "Choose half, 85, full, third, or two-thirds column width");
+            if (width == 0) return result(false, "Choose quarter, half, 85, full, third, or two-thirds column width");
             // Same operation as Hyprland's colresize, on the explicitly selected
             // owner's column. Native scrolling owns sizes, gaps and viewport.
             scrolling->column->setColumnWidth(width);
@@ -505,7 +505,7 @@ std::string gooeyButtonDescription(PHLWINDOW w, const std::string& name) {
     if (name.starts_with("column-")) {
         const auto scrolling = scrollingOwner(w);
         const std::string dimension = scrolling && !scrolling->data->controller->isPrimaryHorizontal() ? "height" : "width";
-        return "Set column " + dimension + " to " + (name == "column-half" ? "50%" : name == "column-85" ? "85%" : "100%");
+        return "Set column " + dimension + " to " + (name == "column-quarter" ? "25%" : name == "column-half" ? "50%" : name == "column-85" ? "85%" : "100%");
     }
     if (name == "fullscreen") return "Full screen (Super+F); press Super+F to restore";
     if (name == "close") return "Close window";

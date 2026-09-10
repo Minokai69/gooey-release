@@ -73,12 +73,12 @@ Shelf retrieval does not invent a destination.
 Dwindle tiles expose `split` and `swap l|r|u|d`. Split synchronously focuses the
 captured owner before the native layout message. Scrolling tiles expose:
 
-- `column-width half|85|full|third|two-thirds`: set the owner's normalized column size.
+- `column-width quarter|half|85|full|third|two-thirds`: set the owner's normalized column size.
 - `column-center`: center that column in the scrolling viewport.
 - `column-focus previous|next`: focus and bring the adjacent column into view,
   including when the user's `follow_focus` preference is disabled.
 
-The public UI offers Half/85%/Full sizes. A full column remains tiled and can be
+The public UI offers 25%/Half/85%/Full sizes. A full column remains tiled and can be
 scrolled past; it is distinct from Maximize. Vertical scrolling labels these sizes
 as heights. Column actions act on the entire native column, including other windows
 stacked in it. State includes column index/count, size, direction, and member count.
