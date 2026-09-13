@@ -7,7 +7,8 @@ make the mouse useful alongside the shortcuts you already like.
 This is a **source-install preview candidate**, not a general compatibility release.
 The current source identifies as 0.1.0-preview.3. The published preview 2 tag remains
 available; preview 3 has not been tagged as a release. Gooey is distributed
-directly from this public repository as an independent source-install project.
+directly from this public repository for Omarchy on Hyprland. Other Quickshell
+environments on Hyprland are future work.
 
 ## Preview 3 source update
 

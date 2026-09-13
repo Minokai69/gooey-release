@@ -1,6 +1,7 @@
 # Gooey — product direction
 
-Gooey is an installable, mouse-friendly fork of the Omarchy Quickshell experience.
+Gooey is an installable, mouse-friendly extension of Omarchy’s Quickshell
+experience on Hyprland. Omarchy is the current product and support target.
 Use **Gooey** as the display name and `gooey` for package, command,
 and plugin namespaces.
 Gooey works **with Hyprland**: it is a graphical route to the compositor operations
@@ -54,7 +55,8 @@ based on hyprbars, with Quickshell menus in normal Omarchy plugins. Geometry,
 mouse input, and local release workflows are exercised in the nested desktop
 before production activation.
 This adds a separate native compatibility boundary; do not imply QML plugin updates
-alone maintain it. Niri attached controls require their own compositor investigation.
+alone maintain it. Other Quickshell environments on Hyprland will need separate integration and
+compatibility testing before support is offered.
 
 The installed version inspected here supports:
 
@@ -148,15 +150,16 @@ upstream changed; it does not by itself prove incompatibility. Before release,
 replace reliance on a package snapshot alone with a pinned upstream Git revision
 and a reproducible import/update process.
 
-## Hyprland and Niri
+## Supported environment and future options
 
-Keep common mouse UI separate from compositor operations. Implement a capability
-interface for window focus, closing, movement, resizing, and workspace management.
-Expose the actions supported by each compositor instead of assuming identical tiling.
+Build and test Gooey for Omarchy on Hyprland first. Its current launcher, theme,
+bar, session, and installation integration depend on Omarchy’s Quickshell setup.
 
-Start with the existing Omarchy Hyprland integration. Niri remains a product goal;
-the current copied host and test harness do not establish Niri compatibility. Its
-session/service assumptions need a separate audit and nested test environment.
+Future options may support other Quickshell environments on Hyprland. Keep the
+Hyprland window operations separate from the Omarchy shell integration so those
+environments can receive their own launcher, theme, and session adapters.
+No additional environment is currently supported; each will require its own
+installation and compatibility tests.
 
 ## Delivery milestones
 
@@ -165,7 +168,7 @@ session/service assumptions need a separate audit and nested test environment.
 3. Versioned local releases and private-profile install/select/restore/rollback tests — implemented.
 4. Personal daily-use integration for the pinned host, guarded startup, and graphical restore — implemented; main-session activation is an explicit operation.
 5. Public packaging/update channel, broader compatibility, and graphical configuration — future work.
-6. Niri backend, integration audit, and compositor compatibility tests — future work.
+6. Other Quickshell environments on Hyprland, with dedicated integration and compatibility tests — future work.
 
 ## Local evidence
 

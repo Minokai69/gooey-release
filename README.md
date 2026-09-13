@@ -2,9 +2,9 @@
 
 **Enjoy Hyprland with your mouse. Keep the keybindings you like.**
 
-Gooey is an independent, public, open-source project. Install it directly from
-this repository using the source installer below; an Omarchy marketplace listing
-is not required.
+Gooey is a public, open-source project built for **Omarchy on Hyprland**, using
+Omarchy’s Quickshell environment. Install it directly from this repository using
+the source installer below.
 
 Gooey makes everyday navigation in **Hyprland with Omarchy** more mouse friendly.
 It is for people who struggle to remember or learn lots of keybindings—and people
@@ -80,8 +80,9 @@ metadata. Matching version numbers alone are not enough: Gooey checks the shell
 files and native API compatibility too.
 
 Installation is from reviewed source. The source installer supports this pinned
-host and handles explicit updates; there is no automatic update channel yet. Niri is a future
-goal and is **not supported in this preview**.
+host and handles explicit updates; there is no automatic update channel yet.
+Support for other Quickshell environments on Hyprland is planned for the future.
+For now, Omarchy on Hyprland is the only supported environment.
 
 The right frame button enters true fullscreen, just like **Super+F**. Hyprland
 hides the frame in fullscreen, so **Super+F is the supported way back**. Choose
