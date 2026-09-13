@@ -2,6 +2,10 @@
 
 **Enjoy Hyprland with your mouse. Keep the keybindings you like.**
 
+Gooey is an independent, public, open-source project. Install it directly from
+this repository using the source installer below; an Omarchy marketplace listing
+is not required.
+
 Gooey makes everyday navigation in **Hyprland with Omarchy** more mouse friendly.
 It is for people who struggle to remember or learn lots of keybindings—and people
 who simply do not want to memorize 30 shortcuts just to get around their desktop.
